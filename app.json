@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "책력",
+    "slug": "chaengnyeok",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "chaengnyeok",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#EAF3DE"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ryubi.chaengnyeok",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#EAF3DE"
+      },
+      "package": "com.ryubi.chaengnyeok",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "af60028c-4250-4992-88fd-4b08d32a0d74"
+      }
+    }
+  }
+}

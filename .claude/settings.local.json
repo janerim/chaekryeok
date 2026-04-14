@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-expo-app@latest . --template blank-typescript --no-install)",
+      "Bash(npx --yes create-expo-app@latest temp-init --template blank-typescript --no-install)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv temp-init/* .)",
+      "Bash(rmdir temp-init:*)",
+      "Bash(mv temp-init/App.tsx temp-init/app.json temp-init/assets temp-init/index.ts temp-init/package.json temp-init/tsconfig.json .)",
+      "Bash(mv temp-init/.gitignore .)",
+      "Bash(rm -rf temp-init)",
+      "Bash(npm install:*)",
+      "Bash(npx expo:*)",
+      "Read(//private/tmp/**)",
+      "Bash(rm -f rc_test.db)",
+      "Bash(sqlite3 rc_test.db)",
+      "Bash(sips --help)",
+      "Bash(qlmanage -t -s 1024 -o /tmp/qlout assets/icon.svg)",
+      "Read(//tmp/**)",
+      "Bash(sips -g pixelWidth -g pixelHeight /tmp/qlout/icon.svg.png)",
+      "Bash(cp /tmp/qlout/icon.svg.png icon.png)",
+      "Bash(cp /tmp/qlout/icon.svg.png splash-icon.png)",
+      "Bash(cp /tmp/qlout/icon.svg.png adaptive-icon.png)",
+      "Bash(sips -z 64 64 /tmp/qlout/icon.svg.png --out favicon.png)",
+      "Bash(ls -la *.png)"
+    ]
+  }
+}
