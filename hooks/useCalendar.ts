@@ -19,7 +19,7 @@ export type DayCell = {
   weekday: number; // 0 Sun ~ 6 Sat
   finishedBooks: Book[];
   startedBooks: Book[];
-  rangeBooks: { book: Book; kind: 'finished' | 'reading' }[];
+  rangeBooks: { book: Book; kind: 'finished' | 'reading' | 'stopped' }[];
 };
 
 const WEEK_STARTS_ON = 1; // Monday
@@ -33,27 +33,38 @@ export function useCalendarMatrix(currentMonth: Date, books: Book[]) {
     const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
 
+    const effectiveFinish = (b: Book): string | null =>
+      b.is_stopped === 1
+        ? b.stopped_date ?? b.updated_at?.slice(0, 10) ?? null
+        : b.finish_date;
+
     const days: DayCell[] = [];
     const cursor = new Date(gridStart);
     while (cursor <= gridEnd) {
       const dateKey = format(cursor, 'yyyy-MM-dd');
-      const finishedBooks = books.filter((b) => b.finish_date === dateKey);
+      const finishedBooks = books.filter(
+        (b) => effectiveFinish(b) === dateKey
+      );
       const startedBooks = books.filter(
         (b) =>
-          b.is_stopped !== 1 &&
           b.start_date === dateKey &&
-          b.finish_date !== dateKey
+          effectiveFinish(b) !== dateKey
       );
       const rangeBooks: DayCell['rangeBooks'] = [];
       for (const b of books) {
         if (!b.start_date) continue;
-        if (b.is_stopped === 1) continue;
-        const end = b.finish_date ?? todayKey;
+        const finish = effectiveFinish(b);
+        const end = finish ?? todayKey;
         if (dateKey <= b.start_date || dateKey > end) continue;
-        if (b.finish_date === dateKey) continue;
+        if (finish === dateKey) continue;
         rangeBooks.push({
           book: b,
-          kind: b.finish_date ? 'finished' : 'reading',
+          kind:
+            b.is_stopped === 1
+              ? 'stopped'
+              : finish
+                ? 'finished'
+                : 'reading',
         });
       }
       days.push({

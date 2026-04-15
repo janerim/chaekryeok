@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { differenceInCalendarDays, format, subMonths } from 'date-fns';
 import Svg, { Circle, G } from 'react-native-svg';
 import { Colors } from '@/constants/colors';

@@ -9,7 +9,10 @@ type Props = {
   onPress: (cell: DayCell) => void;
 };
 
-type Slot = { book: Book; kind: 'finished' | 'starting-finished' | 'reading' };
+type Slot = {
+  book: Book;
+  kind: 'finished' | 'starting-finished' | 'reading' | 'stopped';
+};
 
 const MAX_SLOTS = 4;
 
@@ -26,11 +29,18 @@ export function CalendarCell({ cell, width, onPress }: Props) {
         : Colors.textPrimary;
 
   const slots: Slot[] = [];
-  for (const b of finishedBooks) slots.push({ book: b, kind: 'finished' });
+  for (const b of finishedBooks) {
+    slots.push({ book: b, kind: b.is_stopped === 1 ? 'stopped' : 'finished' });
+  }
   for (const b of startedBooks) {
     slots.push({
       book: b,
-      kind: b.finish_date ? 'starting-finished' : 'reading',
+      kind:
+        b.is_stopped === 1
+          ? 'stopped'
+          : b.finish_date
+            ? 'starting-finished'
+            : 'reading',
     });
   }
   const visible = slots.slice(0, MAX_SLOTS);
@@ -80,7 +90,11 @@ export function CalendarCell({ cell, width, onPress }: Props) {
                 styles.rangeBar,
                 {
                   backgroundColor:
-                    r.kind === 'reading' ? Colors.accent : Colors.primary,
+                    r.kind === 'reading'
+                      ? Colors.accent
+                      : r.kind === 'stopped'
+                        ? Colors.textSecondary
+                        : Colors.primary,
                 },
               ]}
             />
@@ -99,6 +113,7 @@ function Cover({ slot, compact }: { slot: Slot; compact?: boolean }) {
         styles.coverBox,
         kind === 'reading' && styles.coverReading,
         kind === 'starting-finished' && styles.coverStarting,
+        kind === 'stopped' && styles.coverStopped,
       ]}
     >
       {book.cover_local_path ? (
@@ -117,7 +132,7 @@ function Cover({ slot, compact }: { slot: Slot; compact?: boolean }) {
           </Text>
         </View>
       )}
-      {!compact && kind !== 'finished' && (
+      {!compact && kind !== 'finished' && kind !== 'stopped' && (
         <View
           style={[
             styles.marker,
@@ -131,6 +146,17 @@ function Cover({ slot, compact }: { slot: Slot; compact?: boolean }) {
           <Text style={styles.markerText}>시작</Text>
         </View>
       )}
+      {!compact && kind === 'stopped' && (
+        <View
+          style={[
+            styles.marker,
+            styles.markerStart,
+            { backgroundColor: Colors.textSecondary },
+          ]}
+        >
+          <Text style={styles.markerText}>중단</Text>
+        </View>
+      )}
       {!compact && kind === 'finished' && (
         <View style={[styles.marker, styles.markerEnd]}>
           <Text style={styles.markerText}>✓</Text>
@@ -142,10 +168,19 @@ function Cover({ slot, compact }: { slot: Slot; compact?: boolean }) {
             styles.cornerDot,
             {
               backgroundColor:
-                kind === 'reading' ? Colors.accent : Colors.primary,
+                kind === 'reading'
+                  ? Colors.accent
+                  : kind === 'stopped'
+                    ? Colors.textSecondary
+                    : Colors.primary,
             },
           ]}
         />
+      )}
+      {book.from_wishlist === 1 && (
+        <View style={styles.wishMark}>
+          <Text style={styles.wishMarkText}>🔖</Text>
+        </View>
       )}
     </View>
   );
@@ -204,6 +239,11 @@ const styles = StyleSheet.create({
   coverReading: {
     borderColor: Colors.accent,
     borderWidth: 2,
+  },
+  coverStopped: {
+    borderColor: Colors.textSecondary,
+    borderWidth: 1.5,
+    opacity: 0.7,
   },
   coverStarting: {
     borderColor: Colors.primary,
@@ -272,6 +312,15 @@ const styles = StyleSheet.create({
     paddingBottom: 3,
     gap: 2,
   },
+  wishMark: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 6,
+    paddingHorizontal: 1,
+  },
+  wishMarkText: { fontSize: 9, lineHeight: 11 },
   rangeBar: {
     width: '100%',
     height: 3,

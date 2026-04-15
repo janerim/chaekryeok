@@ -8,42 +8,28 @@ import {
   View,
 } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { differenceInCalendarDays } from 'date-fns';
 import { Colors } from '@/constants/colors';
-import { getBook, type Book } from '@/db/database';
-import { useBookStore } from '@/store/bookStore';
-import { StarRating } from '@/components/book/StarRating';
+import { getWishlistItem, type Wishlist } from '@/db/database';
+import { useWishlistStore } from '@/store/wishlistStore';
 
-export default function BookDetailScreen() {
+export default function WishlistDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const bookId = id ? Number(id) : null;
-  const { books } = useBookStore();
-  const [book, setBook] = useState<Book | null>(null);
+  const itemId = id ? Number(id) : null;
+  const { items } = useWishlistStore();
+  const [item, setItem] = useState<Wishlist | null>(null);
 
   useEffect(() => {
-    if (bookId === null) return;
-    getBook(bookId).then(setBook);
-  }, [bookId, books]);
+    if (itemId === null) return;
+    getWishlistItem(itemId).then(setItem);
+  }, [itemId, items]);
 
-  if (!book) {
+  if (!item) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>불러오는 중...</Text>
       </View>
     );
   }
-
-  const endForPeriod = book.finish_date ?? (book.is_stopped === 1 ? book.stopped_date : null);
-  const period =
-    book.start_date && endForPeriod
-      ? differenceInCalendarDays(
-          new Date(endForPeriod),
-          new Date(book.start_date)
-        ) + 1
-      : null;
-  const isStopped = book.is_stopped === 1;
-  const isReading = !!book.start_date && !book.finish_date && !isStopped;
-  const status = isStopped ? '중단' : isReading ? '읽는 중' : book.finish_date ? '완독' : '기록';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -53,8 +39,8 @@ export default function BookDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/book-form',
-                  params: { id: String(book.id) },
+                  pathname: '/wishlist-form',
+                  params: { id: String(item.id) },
                 })
               }
               hitSlop={10}
@@ -64,9 +50,10 @@ export default function BookDetailScreen() {
           ),
         }}
       />
+
       <View style={styles.coverWrap}>
-        {book.cover_local_path ? (
-          <Image source={{ uri: book.cover_local_path }} style={styles.cover} />
+        {item.cover_local_path ? (
+          <Image source={{ uri: item.cover_local_path }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Text style={styles.muted}>표지 없음</Text>
@@ -74,84 +61,42 @@ export default function BookDetailScreen() {
         )}
       </View>
 
-      <Text style={styles.title}>{book.title}</Text>
-      {!!book.author && <Text style={styles.sub}>{book.author}</Text>}
+      <Text style={styles.title}>{item.title}</Text>
+      {!!item.author && <Text style={styles.sub}>{item.author}</Text>}
 
       <View style={styles.badges}>
-        <View
-          style={[
-            styles.badge,
-            {
-              backgroundColor: isReading
-                ? Colors.accent
-                : isStopped
-                  ? Colors.textSecondary
-                  : book.finish_date
-                    ? Colors.primary
-                    : Colors.textSecondary,
-            },
-          ]}
-        >
-          <Text style={styles.badgeText}>{status}</Text>
+        <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+          <Text style={styles.badgeText}>🔖 읽고 싶은</Text>
         </View>
-        {!!book.genre && (
+        {!!item.genre && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{book.genre}</Text>
-          </View>
-        )}
-        {book.from_wishlist === 1 && (
-          <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
-            <Text style={styles.badgeText}>🔖 위시리스트</Text>
+            <Text style={styles.badgeText}>{item.genre}</Text>
           </View>
         )}
       </View>
 
       <View style={styles.card}>
-        <Row label="제목" value={book.title} />
-        <Row label="저자" value={book.author} />
-        <Row label="출판사" value={book.publisher} />
-        <Row label="장르" value={book.genre} />
+        <Row label="제목" value={item.title} />
+        <Row label="저자" value={item.author} />
+        <Row label="출판사" value={item.publisher} />
+        <Row label="장르" value={item.genre} />
       </View>
 
       <View style={styles.card}>
-        {book.from_wishlist === 1 && (
-          <Row
-            label="읽고 싶어한 날"
-            value={book.wishlist_added_date?.slice(0, 10) ?? null}
-          />
-        )}
-        <Row label="시작일" value={book.start_date} />
-        <Row
-          label="완독일"
-          value={
-            book.finish_date ?? (isReading ? '읽는 중' : isStopped ? '중단됨' : null)
-          }
-        />
-        {isStopped && <Row label="중단일" value={book.stopped_date} />}
-        <Row label="기간" value={period !== null ? `${period}일` : null} />
-        <Row label="읽는 중" value={isReading ? '예' : '아니오'} />
-        <Row label="읽다가 멈춤" value={isStopped ? '예' : '아니오'} />
+        <Block label="메모" value={item.memo} />
       </View>
 
-      <View style={styles.card}>
-        <Row label="소장 여부" value={book.is_owned === 1 ? '소장' : '미소장'} />
-        <Row label="읽은 횟수" value={`${book.read_count}회`} />
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>평점</Text>
-          <View style={styles.rowValueWrap}>
-            {book.rating ? (
-              <StarRating value={book.rating} readonly size={18} />
-            ) : (
-              <Text style={styles.rowValueMuted}>—</Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Block label="한줄 감상" value={book.short_review} />
-        <Block label="메모/독후감" value={book.memo} />
-      </View>
+      <Pressable
+        onPress={() =>
+          router.replace({
+            pathname: '/book-form',
+            params: { wishlistId: String(item.id) },
+          })
+        }
+        style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.primaryBtnText}>＋ 기록으로 추가</Text>
+      </Pressable>
 
       <View style={{ height: 32 }} />
     </ScrollView>
@@ -259,12 +204,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     opacity: 0.7,
   },
-  rowValueWrap: { flex: 1, alignItems: 'flex-end' },
   block: {
     paddingVertical: 11,
     gap: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
   },
   blockValue: {
     fontSize: 14,
@@ -277,4 +219,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingHorizontal: 8,
   },
+  primaryBtn: {
+    marginTop: 4,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+  },
+  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

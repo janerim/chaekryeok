@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,16 +15,28 @@ import * as Clipboard from 'expo-clipboard';
 import { Colors } from '@/constants/colors';
 import {
   buildBackupJson,
-  importBooks,
+  importBackup,
   parseBackupJson,
   wipeAllData,
 } from '@/lib/backup';
 import { useBookStore } from '@/store/bookStore';
+import { useWishlistStore } from '@/store/wishlistStore';
+import { SAMPLE_BOOKS } from '@/constants/sampleBooks';
+import { SAMPLE_WISHLIST } from '@/constants/sampleWishlist';
 
 export default function BackupScreen() {
-  const { books, refresh } = useBookStore();
+  const { books, refresh, addBook } = useBookStore();
+  const {
+    items: wishlistItems,
+    refresh: refreshWishlist,
+    add: addWishlist,
+  } = useWishlistStore();
   const [busy, setBusy] = useState(false);
   const [pasted, setPasted] = useState('');
+
+  useEffect(() => {
+    refreshWishlist().catch(console.error);
+  }, [refreshWishlist]);
 
   const onExport = async () => {
     setBusy(true);
@@ -37,7 +49,7 @@ export default function BackupScreen() {
       });
       Alert.alert(
         '내보내기 완료',
-        `${books.length}권을 내보냈습니다.\n클립보드에도 복사되었고, 파일은 다음 경로에 저장됐어요.\n\n${path}`
+        `기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권을 내보냈습니다.\n클립보드에도 복사되었고, 파일은 다음 경로에 저장됐어요.\n\n${path}`
       );
     } catch (e: any) {
       Alert.alert('내보내기 실패', e?.message ?? String(e));
@@ -63,12 +75,13 @@ export default function BackupScreen() {
     setBusy(true);
     try {
       const parsed = parseBackupJson(pasted);
-      const n = await importBooks(parsed, mode);
+      const n = await importBackup(parsed, mode);
       await refresh();
+      await refreshWishlist();
       setPasted('');
       Alert.alert(
         '불러오기 완료',
-        `${n}권을 ${mode === 'replace' ? '복원' : '추가'}했어요.`
+        `기록 ${n.books}권 · 읽고싶은 ${n.wishlist}권을 ${mode === 'replace' ? '복원' : '추가'}했어요.`
       );
     } catch (e: any) {
       Alert.alert('불러오기 실패', e?.message ?? String(e));
@@ -84,7 +97,7 @@ export default function BackupScreen() {
     }
     Alert.alert(
       '불러오기 방식',
-      `기존 ${books.length}권에 대해 어떻게 할까요?`,
+      `기존 기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권에 대해 어떻게 할까요?`,
       [
         { text: '취소', style: 'cancel' },
         {
@@ -109,16 +122,20 @@ export default function BackupScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>내보내기</Text>
         <Text style={styles.cardDesc}>
-          현재 기록 {books.length}권을 JSON으로 저장합니다. 공유 시트에서
-          Files / 메일 / 메모 등으로 보관할 수 있어요. 같은 내용이 클립보드에도
-          복사됩니다.
+          현재 기록 {books.length}권과 읽고 싶은 책 {wishlistItems.length}권을
+          JSON으로 저장합니다. 공유 시트에서 Files / 메일 / 메모 등으로 보관할 수
+          있어요. 같은 내용이 클립보드에도 복사됩니다.
         </Text>
         <Pressable
           onPress={onExport}
-          disabled={busy || books.length === 0}
+          disabled={busy || (books.length === 0 && wishlistItems.length === 0)}
           style={({ pressed }) => [
             styles.primaryBtn,
-            (pressed || busy || books.length === 0) && { opacity: 0.5 },
+            (pressed ||
+              busy ||
+              (books.length === 0 && wishlistItems.length === 0)) && {
+              opacity: 0.5,
+            },
           ]}
         >
           <Text style={styles.primaryBtnText}>백업 파일 내보내기</Text>
@@ -165,18 +182,20 @@ export default function BackupScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>전체 삭제</Text>
         <Text style={styles.cardDesc}>
-          모든 책 기록({books.length}권)과 저장된 표지 이미지를 영구 삭제합니다.
-          되돌릴 수 없으니 먼저 백업을 권장해요.
+          기록 {books.length}권과 읽고 싶은 책 {wishlistItems.length}권,
+          저장된 표지 이미지를 모두 영구 삭제합니다. 되돌릴 수 없으니 먼저
+          백업을 권장해요.
         </Text>
         <Pressable
           onPress={() => {
-            if (books.length === 0) {
+            const total = books.length + wishlistItems.length;
+            if (total === 0) {
               Alert.alert('삭제할 데이터가 없어요');
               return;
             }
             Alert.alert(
               '전체 삭제 확인',
-              `정말 ${books.length}권 전체를 삭제할까요? 되돌릴 수 없습니다.`,
+              `정말 기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권을 모두 삭제할까요? 되돌릴 수 없습니다.`,
               [
                 { text: '취소', style: 'cancel' },
                 {
@@ -187,6 +206,7 @@ export default function BackupScreen() {
                     try {
                       await wipeAllData();
                       await refresh();
+                      await refreshWishlist();
                       Alert.alert('삭제 완료', '모든 데이터가 삭제되었습니다.', [
                         { text: '확인', onPress: () => router.back() },
                       ]);
@@ -207,6 +227,52 @@ export default function BackupScreen() {
           ]}
         >
           <Text style={styles.dangerBtnText}>전체 데이터 삭제</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>샘플 데이터 넣기</Text>
+        <Text style={styles.cardDesc}>
+          스크린샷용 더미 데이터를 현재 DB에 추가합니다. 기록 {SAMPLE_BOOKS.length}권,
+          읽고 싶은 책 {SAMPLE_WISHLIST.length}권이 들어갑니다.
+        </Text>
+        <Pressable
+          onPress={() => {
+            Alert.alert(
+              '샘플 추가',
+              '기존 데이터는 유지되고 샘플이 추가됩니다. 진행할까요?',
+              [
+                { text: '취소', style: 'cancel' },
+                {
+                  text: '추가',
+                  onPress: async () => {
+                    setBusy(true);
+                    try {
+                      for (const b of SAMPLE_BOOKS) await addBook(b);
+                      for (const w of SAMPLE_WISHLIST) await addWishlist(w);
+                      await refresh();
+                      await refreshWishlist();
+                      Alert.alert(
+                        '샘플 추가 완료',
+                        `기록 ${SAMPLE_BOOKS.length}권 · 읽고싶은 ${SAMPLE_WISHLIST.length}권을 추가했어요.`
+                      );
+                    } catch (e: any) {
+                      Alert.alert('실패', e?.message ?? String(e));
+                    } finally {
+                      setBusy(false);
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+          disabled={busy}
+          style={({ pressed }) => [
+            styles.secondaryBtn,
+            (pressed || busy) && { opacity: 0.5 },
+          ]}
+        >
+          <Text style={styles.secondaryBtnText}>샘플 데이터 추가</Text>
         </Pressable>
       </View>
 

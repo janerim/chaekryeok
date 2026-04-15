@@ -12,6 +12,9 @@ export type Book = {
   finish_date: string | null;
   is_owned: number;
   is_stopped: number;
+  stopped_date: string | null;
+  from_wishlist: number;
+  wishlist_added_date: string | null;
   rating: number | null;
   short_review: string | null;
   memo: string | null;
@@ -54,6 +57,21 @@ export async function getDB(): Promise<SQLite.SQLiteDatabase> {
       'ALTER TABLE books ADD COLUMN is_stopped INTEGER DEFAULT 0'
     );
   } catch {}
+  try {
+    await dbInstance.execAsync(
+      'ALTER TABLE books ADD COLUMN from_wishlist INTEGER DEFAULT 0'
+    );
+  } catch {}
+  try {
+    await dbInstance.execAsync(
+      'ALTER TABLE books ADD COLUMN stopped_date TEXT'
+    );
+  } catch {}
+  try {
+    await dbInstance.execAsync(
+      'ALTER TABLE books ADD COLUMN wishlist_added_date TEXT'
+    );
+  } catch {}
   return dbInstance;
 }
 
@@ -91,8 +109,9 @@ export async function insertBook(input: BookInput): Promise<number> {
   const result = await db.runAsync(
     `INSERT INTO books
       (title, author, publisher, genre, cover_local_path, start_date, finish_date,
-       is_owned, is_stopped, rating, short_review, memo, read_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       is_owned, is_stopped, stopped_date, from_wishlist, wishlist_added_date, rating,
+       short_review, memo, read_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     input.title,
     input.author,
     input.publisher,
@@ -102,6 +121,9 @@ export async function insertBook(input: BookInput): Promise<number> {
     input.finish_date,
     input.is_owned,
     input.is_stopped,
+    input.stopped_date ?? null,
+    input.from_wishlist ?? 0,
+    input.wishlist_added_date ?? null,
     input.rating,
     input.short_review,
     input.memo,
@@ -115,7 +137,8 @@ export async function updateBook(id: number, input: BookInput): Promise<void> {
   await db.runAsync(
     `UPDATE books SET
        title = ?, author = ?, publisher = ?, genre = ?, cover_local_path = ?,
-       start_date = ?, finish_date = ?, is_owned = ?, is_stopped = ?, rating = ?,
+       start_date = ?, finish_date = ?, is_owned = ?, is_stopped = ?,
+       stopped_date = ?, from_wishlist = ?, wishlist_added_date = ?, rating = ?,
        short_review = ?, memo = ?, read_count = ?, updated_at = datetime('now')
      WHERE id = ?`,
     input.title,
@@ -127,12 +150,135 @@ export async function updateBook(id: number, input: BookInput): Promise<void> {
     input.finish_date,
     input.is_owned,
     input.is_stopped,
+    input.stopped_date ?? null,
+    input.from_wishlist ?? 0,
+    input.wishlist_added_date ?? null,
     input.rating,
     input.short_review,
     input.memo,
     input.read_count,
     id
   );
+}
+
+export type Wishlist = {
+  id: number;
+  title: string;
+  author: string | null;
+  publisher: string | null;
+  genre: string | null;
+  memo: string | null;
+  cover_local_path: string | null;
+  created_at: string;
+};
+
+export type WishlistInput = Omit<Wishlist, 'id' | 'created_at'> & {
+  created_at?: string;
+};
+
+async function ensureWishlistTable(db: SQLite.SQLiteDatabase) {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS wishlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      author TEXT,
+      publisher TEXT,
+      genre TEXT,
+      memo TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  try {
+    await db.execAsync(
+      'ALTER TABLE wishlist ADD COLUMN cover_local_path TEXT'
+    );
+  } catch {}
+}
+
+export async function listWishlist(): Promise<Wishlist[]> {
+  const db = await getDB();
+  await ensureWishlistTable(db);
+  return db.getAllAsync<Wishlist>(
+    'SELECT * FROM wishlist ORDER BY created_at DESC'
+  );
+}
+
+export async function getWishlistItem(id: number): Promise<Wishlist | null> {
+  const db = await getDB();
+  await ensureWishlistTable(db);
+  const row = await db.getFirstAsync<Wishlist>(
+    'SELECT * FROM wishlist WHERE id = ?',
+    id
+  );
+  return row ?? null;
+}
+
+export async function insertWishlist(input: WishlistInput): Promise<number> {
+  const db = await getDB();
+  await ensureWishlistTable(db);
+  const result = input.created_at
+    ? await db.runAsync(
+        `INSERT INTO wishlist (title, author, publisher, genre, memo, cover_local_path, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        input.title,
+        input.author,
+        input.publisher,
+        input.genre,
+        input.memo,
+        input.cover_local_path,
+        input.created_at
+      )
+    : await db.runAsync(
+        `INSERT INTO wishlist (title, author, publisher, genre, memo, cover_local_path)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        input.title,
+        input.author,
+        input.publisher,
+        input.genre,
+        input.memo,
+        input.cover_local_path
+      );
+  return result.lastInsertRowId;
+}
+
+export async function updateWishlist(
+  id: number,
+  input: WishlistInput
+): Promise<void> {
+  const db = await getDB();
+  await ensureWishlistTable(db);
+  await db.runAsync(
+    `UPDATE wishlist SET title = ?, author = ?, publisher = ?, genre = ?, memo = ?, cover_local_path = ? WHERE id = ?`,
+    input.title,
+    input.author,
+    input.publisher,
+    input.genre,
+    input.memo,
+    input.cover_local_path,
+    id
+  );
+}
+
+export async function deleteWishlist(
+  id: number,
+  opts: { keepCover?: boolean } = {}
+): Promise<void> {
+  const db = await getDB();
+  await ensureWishlistTable(db);
+  if (!opts.keepCover) {
+    const row = await db.getFirstAsync<Wishlist>(
+      'SELECT * FROM wishlist WHERE id = ?',
+      id
+    );
+    if (row?.cover_local_path) {
+      try {
+        await FileSystem.deleteAsync(row.cover_local_path, {
+          idempotent: true,
+        });
+      } catch {}
+    }
+  }
+  await db.runAsync('DELETE FROM wishlist WHERE id = ?', id);
 }
 
 export async function deleteBook(id: number): Promise<void> {

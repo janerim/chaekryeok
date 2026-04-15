@@ -30,6 +30,10 @@ export default function TabsLayout() {
         options={{ title: '전체 기록', tabBarIcon: tabIcon('📚') }}
       />
       <Tabs.Screen
+        name="wishlist"
+        options={{ title: '읽고 싶은', tabBarIcon: tabIcon('🔖') }}
+      />
+      <Tabs.Screen
         name="stats"
         options={{ title: '통계', tabBarIcon: tabIcon('📊') }}
       />

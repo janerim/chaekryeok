@@ -49,6 +49,22 @@ export default function RootLayout() {
             options={{ presentation: 'modal', headerShown: false }}
           />
           <Stack.Screen
+            name="wishlist-detail"
+            options={{
+              headerShown: true,
+              title: '읽고 싶은 책',
+              headerBackTitle: '뒤로',
+            }}
+          />
+          <Stack.Screen
+            name="wishlist-form"
+            options={{
+              presentation: 'modal',
+              headerShown: true,
+              title: '읽고 싶은 책',
+            }}
+          />
+          <Stack.Screen
             name="backup"
             options={{
               headerShown: true,

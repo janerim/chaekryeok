@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
-  SafeAreaView,
   SectionList,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
 import type { Book } from '@/db/database';
@@ -149,6 +149,7 @@ function Row({ book }: { book: Book }) {
       )}
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={2}>
+          {book.from_wishlist === 1 ? '🔖 ' : ''}
           {book.title}
         </Text>
         {!!book.author && (
@@ -156,15 +157,37 @@ function Row({ book }: { book: Book }) {
             {book.author}
           </Text>
         )}
-        <Text style={styles.date} numberOfLines={1}>
-          {book.finish_date
-            ? `완독 · ${book.finish_date}`
-            : isStopped
-              ? `중단 · ${book.start_date ?? '—'}부터`
-              : isReading
-                ? `읽는 중 · ${book.start_date}부터`
+        <View style={styles.statusRow}>
+          {book.finish_date ? (
+            <View style={[styles.statusPill, { backgroundColor: Colors.primary }]}>
+              <Text style={styles.statusPillText}>완독</Text>
+            </View>
+          ) : isStopped ? (
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: Colors.textSecondary },
+              ]}
+            >
+              <Text style={styles.statusPillText}>중단</Text>
+            </View>
+          ) : isReading ? (
+            <View style={[styles.statusPill, { backgroundColor: Colors.accent }]}>
+              <Text style={styles.statusPillText}>읽는 중</Text>
+            </View>
+          ) : (
+            <View style={[styles.statusPill, styles.statusPillMuted]}>
+              <Text style={styles.statusPillMutedText}>기록</Text>
+            </View>
+          )}
+          <Text style={styles.date} numberOfLines={1}>
+            {book.finish_date
+              ? book.finish_date
+              : book.start_date
+                ? `${book.start_date}부터`
                 : '날짜 미설정'}
-        </Text>
+          </Text>
+        </View>
         <View style={styles.meta}>
           {!!book.genre && (
             <View style={styles.chip}>
@@ -247,7 +270,34 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 3, justifyContent: 'center' },
   title: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   sub: { fontSize: 13, color: Colors.textSecondary },
-  date: { fontSize: 12, color: Colors.textSecondary },
+  date: { fontSize: 12, color: Colors.textSecondary, flex: 1 },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  statusPillText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  statusPillMuted: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statusPillMutedText: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
   chip: {
     paddingHorizontal: 8,

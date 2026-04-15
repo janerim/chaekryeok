@@ -22,7 +22,13 @@
       "Bash(cp /tmp/qlout/icon.svg.png splash-icon.png)",
       "Bash(cp /tmp/qlout/icon.svg.png adaptive-icon.png)",
       "Bash(sips -z 64 64 /tmp/qlout/icon.svg.png --out favicon.png)",
-      "Bash(ls -la *.png)"
+      "Bash(ls -la *.png)",
+      "Bash(ls babel.config.*)",
+      "Bash(cat babel.config.js)",
+      "Bash(cat babel.config.json)",
+      "Bash(npx tsc:*)",
+      "Bash(ls node_modules/date-fns/parseISO*)",
+      "Bash(ls node_modules/date-fns/locale/ko*)"
     ]
   }
 }

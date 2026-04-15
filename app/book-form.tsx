@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +17,8 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
-import { getBook, type BookInput } from '@/db/database';
+import { useWishlistStore } from '@/store/wishlistStore';
+import { getBook, getWishlistItem, type BookInput, type Wishlist } from '@/db/database';
 import { StarRating } from '@/components/book/StarRating';
 import { GenreSelector } from '@/components/book/GenreTag';
 import { DatePickerButton } from '@/components/common/DatePickerButton';
@@ -31,6 +34,9 @@ const EMPTY: BookInput = {
   finish_date: null,
   is_owned: 0,
   is_stopped: 0,
+  stopped_date: null,
+  from_wishlist: 0,
+  wishlist_added_date: null,
   rating: 0,
   short_review: '',
   memo: '',
@@ -38,15 +44,57 @@ const EMPTY: BookInput = {
 };
 
 export default function BookFormScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, wishlistId, startDate } = useLocalSearchParams<{
+    id?: string;
+    wishlistId?: string;
+    startDate?: string;
+  }>();
   const editId = id ? Number(id) : null;
   const isEdit = editId !== null;
+  const initialWishlistId = wishlistId ? Number(wishlistId) : null;
 
   const { addBook, editBook, removeBook } = useBookStore();
-  const [form, setForm] = useState<BookInput>(EMPTY);
+  const {
+    items: wishlistItems,
+    refresh: refreshWishlist,
+    remove: removeWishlist,
+  } = useWishlistStore();
+  const [form, setForm] = useState<BookInput>(() =>
+    startDate ? { ...EMPTY, start_date: startDate } : EMPTY
+  );
   const [isReading, setIsReading] = useState(false);
   const [originalCover, setOriginalCover] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fromWishlistId, setFromWishlistId] = useState<number | null>(
+    initialWishlistId
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (isEdit || initialWishlistId === null) return;
+    getWishlistItem(initialWishlistId).then((w) => {
+      if (!w) return;
+      applyWishlist(w);
+    });
+  }, [initialWishlistId, isEdit]);
+
+  useEffect(() => {
+    if (!isEdit) refreshWishlist().catch(console.error);
+  }, [isEdit, refreshWishlist]);
+
+  const applyWishlist = (w: Wishlist) => {
+    setForm((f) => ({
+      ...f,
+      title: w.title,
+      author: w.author ?? '',
+      publisher: w.publisher ?? '',
+      genre: w.genre,
+      memo: w.memo ?? '',
+      cover_local_path: w.cover_local_path ?? f.cover_local_path,
+      wishlist_added_date: w.created_at ?? null,
+    }));
+    setFromWishlistId(w.id);
+  };
 
   useEffect(() => {
     if (!isEdit || editId === null) return;
@@ -62,12 +110,17 @@ export default function BookFormScreen() {
         finish_date: b.finish_date,
         is_owned: b.is_owned,
         is_stopped: b.is_stopped ?? 0,
+        stopped_date: b.stopped_date ?? null,
+        from_wishlist: b.from_wishlist ?? 0,
+        wishlist_added_date: b.wishlist_added_date ?? null,
         rating: b.rating ?? 0,
         short_review: b.short_review ?? '',
         memo: b.memo ?? '',
         read_count: b.read_count,
       });
-      setIsReading(!b.finish_date && !!b.start_date);
+      setIsReading(
+        !b.finish_date && !!b.start_date && (b.is_stopped ?? 0) !== 1
+      );
       setOriginalCover(b.cover_local_path);
     });
   }, [editId, isEdit]);
@@ -93,6 +146,13 @@ export default function BookFormScreen() {
     if (v) {
       update('finish_date', null);
       setIsReading(false);
+      setForm((f) =>
+        f.stopped_date
+          ? f
+          : { ...f, stopped_date: new Date().toISOString().slice(0, 10) }
+      );
+    } else {
+      update('stopped_date', null);
     }
   };
 
@@ -116,6 +176,9 @@ export default function BookFormScreen() {
         memo: form.memo?.trim() || null,
         rating: form.rating || null,
         finish_date: isReading || form.is_stopped ? null : form.finish_date,
+        stopped_date: form.is_stopped ? form.stopped_date : null,
+        from_wishlist:
+          fromWishlistId !== null ? 1 : form.from_wishlist ?? 0,
       };
       if (isEdit && editId !== null) {
         if (originalCover && originalCover !== payload.cover_local_path) {
@@ -124,6 +187,11 @@ export default function BookFormScreen() {
         await editBook(editId, payload);
       } else {
         await addBook(payload);
+        if (fromWishlistId !== null) {
+          await removeWishlist(fromWishlistId, { keepCover: true }).catch(
+            () => {}
+          );
+        }
       }
       router.back();
     } catch (e: any) {
@@ -153,7 +221,98 @@ export default function BookFormScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: Colors.background }}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {!isEdit && wishlistItems.length > 0 && (
+          <View style={styles.wishlistBanner}>
+            {fromWishlistId !== null ? (
+              <View style={styles.wishlistBannerRow}>
+                <Text style={styles.wishlistBannerText}>
+                  🔖 읽고 싶은 책에서 가져왔어요
+                </Text>
+                <Pressable
+                  onPress={() => setFromWishlistId(null)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.wishlistClear}>해제</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setPickerOpen(true)}
+                style={({ pressed }) => [
+                  styles.wishlistBtn,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text style={styles.wishlistBtnText}>
+                  🔖 읽고 싶은 책에서 가져오기 ({wishlistItems.length})
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        <Modal
+          visible={pickerOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setPickerOpen(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>읽고 싶은 책 선택</Text>
+              <Pressable onPress={() => setPickerOpen(false)} hitSlop={8}>
+                <Text style={styles.modalClose}>닫기</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={wishlistItems}
+              keyExtractor={(it) => String(it.id)}
+              ItemSeparatorComponent={() => (
+                <View style={styles.modalSep} />
+              )}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    applyWishlist(item);
+                    setPickerOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.modalRow,
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  {item.cover_local_path ? (
+                    <Image
+                      source={{ uri: item.cover_local_path }}
+                      style={styles.modalThumb}
+                    />
+                  ) : (
+                    <View style={[styles.modalThumb, styles.modalThumbEmpty]} />
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalRowTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    {!!item.author && (
+                      <Text style={styles.modalRowSub} numberOfLines={1}>
+                        {item.author}
+                      </Text>
+                    )}
+                  </View>
+                  {!!item.genre && (
+                    <Text style={styles.modalRowGenre}>{item.genre}</Text>
+                  )}
+                </Pressable>
+              )}
+            />
+          </View>
+        </Modal>
+
         <Pressable style={styles.coverWrap} onPress={onPickCover}>
           {form.cover_local_path ? (
             <Image source={{ uri: form.cover_local_path }} style={styles.coverImg} />
@@ -217,6 +376,14 @@ export default function BookFormScreen() {
             onValueChange={onToggleStopped}
           />
         </View>
+
+        {form.is_stopped === 1 && (
+          <DatePickerButton
+            label="중단한 날짜"
+            value={form.stopped_date}
+            onChange={(v) => update('stopped_date', v)}
+          />
+        )}
 
         <DatePickerButton
           label="다 읽은 날짜"
@@ -381,4 +548,90 @@ const styles = StyleSheet.create({
     borderColor: Colors.sunday,
   },
   deleteBtnText: { color: Colors.sunday, fontSize: 15, fontWeight: '600' },
+  wishlistBanner: { marginBottom: 4 },
+  wishlistBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.primaryLight ?? Colors.surface,
+    alignItems: 'center',
+  },
+  wishlistBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  wishlistBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight ?? Colors.surface,
+  },
+  wishlistBannerText: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  wishlistClear: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  modalContainer: { flex: 1, backgroundColor: Colors.background },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  modalClose: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
+  modalSep: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  modalRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  modalRowSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  modalThumb: {
+    width: 36,
+    height: 50,
+    borderRadius: 4,
+    backgroundColor: Colors.surface,
+  },
+  modalThumbEmpty: { borderWidth: 1, borderColor: Colors.border },
+  modalRowGenre: {
+    fontSize: 11,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
 });
