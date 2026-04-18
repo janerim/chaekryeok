@@ -21,16 +21,10 @@ import {
 } from '@/lib/backup';
 import { useBookStore } from '@/store/bookStore';
 import { useWishlistStore } from '@/store/wishlistStore';
-import { SAMPLE_BOOKS } from '@/constants/sampleBooks';
-import { SAMPLE_WISHLIST } from '@/constants/sampleWishlist';
 
 export default function BackupScreen() {
-  const { books, refresh, addBook } = useBookStore();
-  const {
-    items: wishlistItems,
-    refresh: refreshWishlist,
-    add: addWishlist,
-  } = useWishlistStore();
+  const { books, refresh } = useBookStore();
+  const { items: wishlistItems, refresh: refreshWishlist } = useWishlistStore();
   const [busy, setBusy] = useState(false);
   const [pasted, setPasted] = useState('');
 
@@ -227,52 +221,6 @@ export default function BackupScreen() {
           ]}
         >
           <Text style={styles.dangerBtnText}>전체 데이터 삭제</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>샘플 데이터 넣기</Text>
-        <Text style={styles.cardDesc}>
-          스크린샷용 더미 데이터를 현재 DB에 추가합니다. 기록 {SAMPLE_BOOKS.length}권,
-          읽고 싶은 책 {SAMPLE_WISHLIST.length}권이 들어갑니다.
-        </Text>
-        <Pressable
-          onPress={() => {
-            Alert.alert(
-              '샘플 추가',
-              '기존 데이터는 유지되고 샘플이 추가됩니다. 진행할까요?',
-              [
-                { text: '취소', style: 'cancel' },
-                {
-                  text: '추가',
-                  onPress: async () => {
-                    setBusy(true);
-                    try {
-                      for (const b of SAMPLE_BOOKS) await addBook(b);
-                      for (const w of SAMPLE_WISHLIST) await addWishlist(w);
-                      await refresh();
-                      await refreshWishlist();
-                      Alert.alert(
-                        '샘플 추가 완료',
-                        `기록 ${SAMPLE_BOOKS.length}권 · 읽고싶은 ${SAMPLE_WISHLIST.length}권을 추가했어요.`
-                      );
-                    } catch (e: any) {
-                      Alert.alert('실패', e?.message ?? String(e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  },
-                },
-              ]
-            );
-          }}
-          disabled={busy}
-          style={({ pressed }) => [
-            styles.secondaryBtn,
-            (pressed || busy) && { opacity: 0.5 },
-          ]}
-        >
-          <Text style={styles.secondaryBtnText}>샘플 데이터 추가</Text>
         </Pressable>
       </View>
 

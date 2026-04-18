@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -69,6 +67,8 @@ export default function BookFormScreen() {
     initialWishlistId
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const memoY = useRef(0);
 
   useEffect(() => {
     if (isEdit || initialWishlistId === null) return;
@@ -217,14 +217,13 @@ export default function BookFormScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: Colors.background }}
-    >
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
       >
         {!isEdit && wishlistItems.length > 0 && (
           <View style={styles.wishlistBanner}>
@@ -417,17 +416,24 @@ export default function BookFormScreen() {
           />
         </Field>
 
-        <Field label="메모/독후감">
-          <TextInput
-            value={form.memo ?? ''}
-            onChangeText={(v) => update('memo', v)}
-            style={[styles.input, styles.multiline]}
-            placeholder="자유롭게 기록"
-            placeholderTextColor={Colors.textSecondary}
-            multiline
-            textAlignVertical="top"
-          />
-        </Field>
+        <View onLayout={(e) => { memoY.current = e.nativeEvent.layout.y; }}>
+          <Field label="메모/독후감">
+            <TextInput
+              value={form.memo ?? ''}
+              onChangeText={(v) => update('memo', v)}
+              style={[styles.input, styles.multiline]}
+              placeholder="자유롭게 기록"
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              textAlignVertical="top"
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollRef.current?.scrollTo({ y: memoY.current - 20, animated: true });
+                }, 300);
+              }}
+            />
+          </Field>
+        </View>
 
         <Field label="읽은 횟수">
           <View style={styles.counterRow}>
@@ -463,7 +469,7 @@ export default function BookFormScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

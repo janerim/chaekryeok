@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +34,8 @@ export default function WishlistFormScreen() {
   const [form, setForm] = useState<WishlistInput>(EMPTY);
   const [originalCover, setOriginalCover] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const memoY = useRef(0);
 
   useEffect(() => {
     if (!isEdit || editId === null) return;
@@ -93,14 +93,13 @@ export default function WishlistFormScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: Colors.background }}
-    >
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
       >
         <Pressable style={styles.coverWrap} onPress={onPickCover}>
           {form.cover_local_path ? (
@@ -143,17 +142,24 @@ export default function WishlistFormScreen() {
         <Field label="장르">
           <GenreSelector value={form.genre} onChange={(v) => update('genre', v)} />
         </Field>
-        <Field label="메모">
-          <TextInput
-            value={form.memo ?? ''}
-            onChangeText={(v) => update('memo', v)}
-            style={[styles.input, styles.multiline]}
-            placeholder="왜 읽고 싶은지, 어디서 봤는지 등"
-            placeholderTextColor={Colors.textSecondary}
-            multiline
-            textAlignVertical="top"
-          />
-        </Field>
+        <View onLayout={(e) => { memoY.current = e.nativeEvent.layout.y; }}>
+          <Field label="메모">
+            <TextInput
+              value={form.memo ?? ''}
+              onChangeText={(v) => update('memo', v)}
+              style={[styles.input, styles.multiline]}
+              placeholder="왜 읽고 싶은지, 어디서 봤는지 등"
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              textAlignVertical="top"
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollRef.current?.scrollTo({ y: memoY.current - 20, animated: true });
+                }, 300);
+              }}
+            />
+          </Field>
+        </View>
 
         <Pressable
           style={[styles.primaryBtn, saving && { opacity: 0.5 }]}
@@ -165,7 +171,7 @@ export default function WishlistFormScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

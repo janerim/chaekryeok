@@ -14,20 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { useWishlistStore } from '@/store/wishlistStore';
 import type { Wishlist } from '@/db/database';
-import { SAMPLE_WISHLIST } from '@/constants/sampleWishlist';
 
 const ACTION_BAR = 162;
 
 type RowHandle = { close: () => void };
 
 export default function WishlistScreen() {
-  const { items, refresh, remove, add } = useWishlistStore();
-
-  const seedSamples = async () => {
-    for (const s of SAMPLE_WISHLIST) {
-      await add(s);
-    }
-  };
+  const { items, refresh, remove } = useWishlistStore();
   const openRef = useRef<RowHandle | null>(null);
 
   useEffect(() => {
@@ -65,15 +58,6 @@ export default function WishlistScreen() {
               ]}
             >
               <Text style={styles.emptyBtnText}>＋ 책 추가</Text>
-            </Pressable>
-            <Pressable
-              onPress={seedSamples}
-              style={({ pressed }) => [
-                styles.emptyBtnAlt,
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Text style={styles.emptyBtnAltText}>샘플 데이터 넣기</Text>
             </Pressable>
           </View>
         }
@@ -328,19 +312,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   emptyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  emptyBtnAlt: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  emptyBtnAltText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
   actionOverlay: {
     position: 'absolute',
     top: 0,
