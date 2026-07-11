@@ -12,6 +12,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import { useWishlistStore } from '@/store/wishlistStore';
 import type { Wishlist } from '@/db/database';
 
@@ -148,7 +149,7 @@ function WishlistRow({
         >
           {item.cover_local_path ? (
             <Image
-              source={{ uri: item.cover_local_path }}
+              source={{ uri: resolveCoverUri(item.cover_local_path)! }}
               style={styles.thumb}
             />
           ) : (

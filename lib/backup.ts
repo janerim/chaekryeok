@@ -11,26 +11,87 @@ import {
   type Wishlist,
   type WishlistInput,
 } from '@/db/database';
+import {
+  COVERS_DIR,
+  ensureCoversDir,
+  isRemoteCover,
+  resolveCoverUri,
+} from '@/lib/covers';
+
+// 백업/복원 시 표지 이미지 데이터를 함께 담기 위한 필드
+type WithCover<T> = T & { cover_b64?: string | null };
 
 export type BackupFile = {
-  version: 2;
+  version: 3;
   app: 'chaengnyeok';
   exportedAt: string;
-  books: Book[];
-  wishlist: Wishlist[];
+  books: WithCover<Book>[];
+  wishlist: WithCover<Wishlist>[];
 };
+
+// 저장된 표지의 실제 파일을 읽어 base64로 붙인다. (원격 URL/파일 없음이면 생략)
+async function attachCoverData<T extends { cover_local_path: string | null }>(
+  rows: T[]
+): Promise<WithCover<T>[]> {
+  const out: WithCover<T>[] = [];
+  for (const r of rows) {
+    let cover_b64: string | null = null;
+    const uri = resolveCoverUri(r.cover_local_path);
+    if (uri && !isRemoteCover(uri)) {
+      try {
+        const info = await FileSystem.getInfoAsync(uri);
+        if (info.exists) {
+          cover_b64 = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        }
+      } catch {}
+    }
+    out.push({ ...r, cover_b64 });
+  }
+  return out;
+}
+
+function extOf(name: string | null | undefined): string {
+  const m = (name ?? '').toLowerCase().match(/\.(jpe?g|png|webp|gif)$/);
+  return m ? `.${m[1].replace('jpeg', 'jpg')}` : '.jpg';
+}
+
+// 백업에 담긴 base64 이미지를 새 파일로 복원하고 파일명을 돌려준다.
+async function restoreCoverData(
+  b64: string | null | undefined,
+  originalPath: string | null
+): Promise<string | null> {
+  if (!b64) return originalPath;
+  await ensureCoversDir();
+  const filename = `${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 8)}${extOf(originalPath)}`;
+  try {
+    await FileSystem.writeAsStringAsync(COVERS_DIR + filename, b64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return filename;
+  } catch {
+    return originalPath;
+  }
+}
 
 export async function buildBackupJson(): Promise<{
   json: string;
   path: string;
 }> {
   const [books, wishlist] = await Promise.all([listBooks(), listWishlist()]);
+  const [booksWithCover, wishlistWithCover] = await Promise.all([
+    attachCoverData(books),
+    attachCoverData(wishlist),
+  ]);
   const payload: BackupFile = {
-    version: 2,
+    version: 3,
     app: 'chaengnyeok',
     exportedAt: new Date().toISOString(),
-    books,
-    wishlist,
+    books: booksWithCover,
+    wishlist: wishlistWithCover,
   };
   const json = JSON.stringify(payload, null, 2);
   const filename = `chaengnyeok_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
@@ -49,7 +110,7 @@ export function parseBackupJson(raw: string): BackupFile {
   if (!parsed || parsed.app !== 'chaengnyeok') {
     throw new Error('책력 백업 파일이 아닙니다.');
   }
-  if (parsed.version !== 1 && parsed.version !== 2) {
+  if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
     throw new Error(`지원하지 않는 버전입니다 (v${parsed.version}).`);
   }
   if (!Array.isArray(parsed.books)) {
@@ -57,7 +118,7 @@ export function parseBackupJson(raw: string): BackupFile {
   }
   const wishlist = Array.isArray(parsed.wishlist) ? parsed.wishlist : [];
   return {
-    version: 2,
+    version: 3,
     app: 'chaengnyeok',
     exportedAt: parsed.exportedAt ?? new Date().toISOString(),
     books: parsed.books,
@@ -93,12 +154,13 @@ export async function importBackup(
   }
   let bookCount = 0;
   for (const b of file.books) {
+    const coverPath = await restoreCoverData(b.cover_b64, b.cover_local_path ?? null);
     const input: BookInput = {
       title: b.title,
       author: b.author ?? null,
       publisher: b.publisher ?? null,
       genre: b.genre ?? null,
-      cover_local_path: b.cover_local_path ?? null,
+      cover_local_path: coverPath,
       start_date: b.start_date ?? null,
       finish_date: b.finish_date ?? null,
       is_owned: b.is_owned ?? 0,
@@ -117,13 +179,14 @@ export async function importBackup(
   }
   let wishlistCount = 0;
   for (const w of file.wishlist) {
+    const coverPath = await restoreCoverData(w.cover_b64, w.cover_local_path ?? null);
     const input: WishlistInput = {
       title: w.title,
       author: w.author ?? null,
       publisher: w.publisher ?? null,
       genre: w.genre ?? null,
       memo: w.memo ?? null,
-      cover_local_path: w.cover_local_path ?? null,
+      cover_local_path: coverPath,
     };
     if (!input.title) continue;
     await insertWishlist(input);

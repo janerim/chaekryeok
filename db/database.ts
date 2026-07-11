@@ -1,5 +1,14 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
+import { resolveCoverUri, toCoverFilename } from '@/lib/covers';
+
+async function deleteCoverFile(stored: string | null): Promise<void> {
+  const uri = resolveCoverUri(stored);
+  if (!uri || /^(https?:|data:)/.test(uri)) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {}
+}
 
 export type Book = {
   id: number;
@@ -116,7 +125,7 @@ export async function insertBook(input: BookInput): Promise<number> {
     input.author,
     input.publisher,
     input.genre,
-    input.cover_local_path,
+    toCoverFilename(input.cover_local_path),
     input.start_date,
     input.finish_date,
     input.is_owned,
@@ -145,7 +154,7 @@ export async function updateBook(id: number, input: BookInput): Promise<void> {
     input.author,
     input.publisher,
     input.genre,
-    input.cover_local_path,
+    toCoverFilename(input.cover_local_path),
     input.start_date,
     input.finish_date,
     input.is_owned,
@@ -225,7 +234,7 @@ export async function insertWishlist(input: WishlistInput): Promise<number> {
         input.publisher,
         input.genre,
         input.memo,
-        input.cover_local_path,
+        toCoverFilename(input.cover_local_path),
         input.created_at
       )
     : await db.runAsync(
@@ -236,7 +245,7 @@ export async function insertWishlist(input: WishlistInput): Promise<number> {
         input.publisher,
         input.genre,
         input.memo,
-        input.cover_local_path
+        toCoverFilename(input.cover_local_path)
       );
   return result.lastInsertRowId;
 }
@@ -254,7 +263,7 @@ export async function updateWishlist(
     input.publisher,
     input.genre,
     input.memo,
-    input.cover_local_path,
+    toCoverFilename(input.cover_local_path),
     id
   );
 }
@@ -271,11 +280,7 @@ export async function deleteWishlist(
       id
     );
     if (row?.cover_local_path) {
-      try {
-        await FileSystem.deleteAsync(row.cover_local_path, {
-          idempotent: true,
-        });
-      } catch {}
+      await deleteCoverFile(row.cover_local_path);
     }
   }
   await db.runAsync('DELETE FROM wishlist WHERE id = ?', id);
@@ -285,9 +290,7 @@ export async function deleteBook(id: number): Promise<void> {
   const db = await getDB();
   const book = await getBook(id);
   if (book?.cover_local_path) {
-    try {
-      await FileSystem.deleteAsync(book.cover_local_path, { idempotent: true });
-    } catch {}
+    await deleteCoverFile(book.cover_local_path);
   }
   await db.runAsync('DELETE FROM books WHERE id = ?', id);
 }

@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import type { DayCell } from '@/hooks/useCalendar';
 import type { Book } from '@/db/database';
 
@@ -118,7 +119,7 @@ function Cover({ slot, compact }: { slot: Slot; compact?: boolean }) {
     >
       {book.cover_local_path ? (
         <Image
-          source={{ uri: book.cover_local_path }}
+          source={{ uri: resolveCoverUri(book.cover_local_path)! }}
           style={[
             styles.coverImg,
             kind === 'starting-finished' && { opacity: 0.75 },

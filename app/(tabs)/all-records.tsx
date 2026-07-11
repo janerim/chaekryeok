@@ -11,6 +11,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import { useBookStore } from '@/store/bookStore';
 import type { Book } from '@/db/database';
 
@@ -139,7 +140,7 @@ function Row({ book }: { book: Book }) {
       }
     >
       {book.cover_local_path ? (
-        <Image source={{ uri: book.cover_local_path }} style={styles.cover} />
+        <Image source={{ uri: resolveCoverUri(book.cover_local_path)! }} style={styles.cover} />
       ) : (
         <View style={[styles.cover, styles.coverEmpty]}>
           <Text style={styles.coverEmptyText} numberOfLines={2}>

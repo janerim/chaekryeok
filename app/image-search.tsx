@@ -41,8 +41,8 @@ const INJECTED_JS = `
     return null;
   }
 
-  function handle(e){
-    var img = findImg(e.target);
+  function select(target, e){
+    var img = findImg(target);
     if (!img) return;
     var url = pickUrl(img);
     if (!url) return;
@@ -56,8 +56,34 @@ const INJECTED_JS = `
     }));
   }
 
-  document.addEventListener('click', handle, true);
-  document.addEventListener('touchend', handle, true);
+  // 탭과 스크롤을 구분: 손가락이 많이 움직였거나 오래 눌렀으면 스크롤로 간주하고 무시
+  var MOVE_TOL = 10;   // px
+  var TIME_TOL = 700;  // ms
+  var startX = 0, startY = 0, startT = 0, moved = false;
+
+  document.addEventListener('touchstart', function(e){
+    var t = e.touches && e.touches[0];
+    if (!t) return;
+    startX = t.clientX; startY = t.clientY;
+    startT = Date.now(); moved = false;
+  }, true);
+
+  document.addEventListener('touchmove', function(e){
+    var t = e.touches && e.touches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - startX) > MOVE_TOL || Math.abs(t.clientY - startY) > MOVE_TOL) {
+      moved = true;
+    }
+  }, true);
+
+  document.addEventListener('touchend', function(e){
+    if (moved) return;                          // 스크롤/드래그면 선택 안 함
+    if (Date.now() - startT > TIME_TOL) return; // 길게 누르면 선택 안 함
+    select(e.target, e);
+  }, true);
+
+  // 데스크톱/비터치 환경 대비 (탭에서만 발생하므로 스크롤과 무관)
+  document.addEventListener('click', function(e){ select(e.target, e); }, true);
   true;
 })();
 true;

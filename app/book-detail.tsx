@@ -10,6 +10,7 @@ import {
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { differenceInCalendarDays } from 'date-fns';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import { getBook, type Book } from '@/db/database';
 import { useBookStore } from '@/store/bookStore';
 import { StarRating } from '@/components/book/StarRating';
@@ -66,7 +67,7 @@ export default function BookDetailScreen() {
       />
       <View style={styles.coverWrap}>
         {book.cover_local_path ? (
-          <Image source={{ uri: book.cover_local_path }} style={styles.cover} />
+          <Image source={{ uri: resolveCoverUri(book.cover_local_path)! }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Text style={styles.muted}>표지 없음</Text>

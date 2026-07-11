@@ -1,5 +1,13 @@
 import { router } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
+import {
+  COVERS_DIR,
+  ensureCoversDir,
+  isRemoteCover,
+  resolveCoverUri,
+} from '@/lib/covers';
+
+export { COVERS_DIR, ensureCoversDir } from '@/lib/covers';
 
 type Resolver = (path: string | null) => void;
 
@@ -21,21 +29,13 @@ export function resolveWebImagePick(path: string | null) {
   if (fn) fn(path);
 }
 
-const COVERS_DIR = FileSystem.documentDirectory + 'covers/';
-
-export async function ensureCoversDir() {
-  const info = await FileSystem.getInfoAsync(COVERS_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(COVERS_DIR, { intermediates: true });
-  }
-}
-
 function extFromUrl(url: string): string {
   const clean = url.split('?')[0].split('#')[0].toLowerCase();
   const m = clean.match(/\.(jpe?g|png|webp|gif)$/);
   return m ? `.${m[1].replace('jpeg', 'jpg')}` : '.jpg';
 }
 
+// 이미지를 covers 폴더에 내려받고, DB에 저장할 "파일명"을 반환한다.
 export async function downloadImageToLocal(url: string): Promise<string> {
   await ensureCoversDir();
   const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${extFromUrl(url)}`;
@@ -44,10 +44,14 @@ export async function downloadImageToLocal(url: string): Promise<string> {
   if (result.status !== 200) {
     throw new Error(`다운로드 실패 (status ${result.status})`);
   }
-  return result.uri;
+  return filename;
 }
 
-export async function deleteLocalImage(uri: string): Promise<void> {
+// 저장된 표지 값(파일명 또는 예전 절대경로)을 받아 실제 파일을 삭제한다.
+export async function deleteLocalImage(stored: string): Promise<void> {
+  if (!stored || isRemoteCover(stored)) return;
+  const uri = resolveCoverUri(stored);
+  if (!uri) return;
   try {
     await FileSystem.deleteAsync(uri, { idempotent: true });
   } catch {}

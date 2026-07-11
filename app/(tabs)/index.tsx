@@ -13,6 +13,7 @@ import { ko } from 'date-fns/locale';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import { useBookStore } from '@/store/bookStore';
 import { MonthNavigator } from '@/components/calendar/MonthNavigator';
 import { CalendarGrid } from '@/components/calendar/CalendarGrid';
@@ -135,7 +136,7 @@ export default function CalendarScreen() {
                       >
                         {book.cover_local_path ? (
                           <Image
-                            source={{ uri: book.cover_local_path }}
+                            source={{ uri: resolveCoverUri(book.cover_local_path)! }}
                             style={styles.entryCover}
                           />
                         ) : (

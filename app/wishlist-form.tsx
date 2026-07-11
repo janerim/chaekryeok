@@ -15,6 +15,7 @@ import { getWishlistItem, type WishlistInput } from '@/db/database';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { GenreSelector } from '@/components/book/GenreTag';
 import { deleteLocalImage, pickWebImage } from '@/hooks/useImagePicker';
+import { resolveCoverUri } from '@/lib/covers';
 
 const EMPTY: WishlistInput = {
   title: '',
@@ -103,7 +104,7 @@ export default function WishlistFormScreen() {
       >
         <Pressable style={styles.coverWrap} onPress={onPickCover}>
           {form.cover_local_path ? (
-            <Image source={{ uri: form.cover_local_path }} style={styles.coverImg} />
+            <Image source={{ uri: resolveCoverUri(form.cover_local_path)! }} style={styles.coverImg} />
           ) : (
             <View style={styles.coverPlaceholder}>
               <Text style={styles.coverPlaceholderText}>+ 표지 선택</Text>

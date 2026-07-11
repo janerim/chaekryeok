@@ -117,8 +117,9 @@ export default function BackupScreen() {
         <Text style={styles.cardTitle}>내보내기</Text>
         <Text style={styles.cardDesc}>
           현재 기록 {books.length}권과 읽고 싶은 책 {wishlistItems.length}권을
-          JSON으로 저장합니다. 공유 시트에서 Files / 메일 / 메모 등으로 보관할 수
-          있어요. 같은 내용이 클립보드에도 복사됩니다.
+          표지 이미지까지 포함해 JSON으로 저장합니다. 이미지가 많으면 파일이 다소
+          클 수 있어요. 공유 시트에서 Files / 메일 / 메모 등으로 보관할 수 있고,
+          같은 내용이 클립보드에도 복사됩니다.
         </Text>
         <Pressable
           onPress={onExport}
@@ -139,8 +140,8 @@ export default function BackupScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>불러오기</Text>
         <Text style={styles.cardDesc}>
-          백업해 둔 JSON을 붙여넣어 복원합니다. 표지 이미지 경로는 새 기기에서는
-          비어 보일 수 있어요.
+          백업해 둔 JSON을 붙여넣어 복원합니다. 표지 이미지도 함께 복원되므로
+          새 기기나 재설치 후에도 표지가 유지됩니다.
         </Text>
         <Pressable
           onPress={onPasteClipboard}

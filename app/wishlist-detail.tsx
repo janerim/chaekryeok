@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
+import { resolveCoverUri } from '@/lib/covers';
 import { getWishlistItem, type Wishlist } from '@/db/database';
 import { useWishlistStore } from '@/store/wishlistStore';
 
@@ -53,7 +54,7 @@ export default function WishlistDetailScreen() {
 
       <View style={styles.coverWrap}>
         {item.cover_local_path ? (
-          <Image source={{ uri: item.cover_local_path }} style={styles.cover} />
+          <Image source={{ uri: resolveCoverUri(item.cover_local_path)! }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, styles.coverEmpty]}>
             <Text style={styles.muted}>표지 없음</Text>

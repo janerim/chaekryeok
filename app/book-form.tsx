@@ -21,6 +21,7 @@ import { StarRating } from '@/components/book/StarRating';
 import { GenreSelector } from '@/components/book/GenreTag';
 import { DatePickerButton } from '@/components/common/DatePickerButton';
 import { deleteLocalImage, pickWebImage } from '@/hooks/useImagePicker';
+import { resolveCoverUri } from '@/lib/covers';
 
 const EMPTY: BookInput = {
   title: '',
@@ -287,7 +288,7 @@ export default function BookFormScreen() {
                 >
                   {item.cover_local_path ? (
                     <Image
-                      source={{ uri: item.cover_local_path }}
+                      source={{ uri: resolveCoverUri(item.cover_local_path)! }}
                       style={styles.modalThumb}
                     />
                   ) : (
@@ -314,7 +315,7 @@ export default function BookFormScreen() {
 
         <Pressable style={styles.coverWrap} onPress={onPickCover}>
           {form.cover_local_path ? (
-            <Image source={{ uri: form.cover_local_path }} style={styles.coverImg} />
+            <Image source={{ uri: resolveCoverUri(form.cover_local_path)! }} style={styles.coverImg} />
           ) : (
             <View style={styles.coverPlaceholder}>
               <Text style={styles.coverPlaceholderText}>+ 표지 선택</Text>
