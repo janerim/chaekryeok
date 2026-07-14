@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Pressable,
   ScrollView,
   Share,
@@ -60,6 +61,7 @@ export default function BackupScreen() {
         return;
       }
       setPasted(s);
+      Keyboard.dismiss();
     } catch (e: any) {
       Alert.alert('붙여넣기 실패', e?.message ?? String(e));
     }
@@ -112,6 +114,7 @@ export default function BackupScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       <View style={styles.card}>
         <Text style={styles.cardTitle}>내보내기</Text>
@@ -153,15 +156,36 @@ export default function BackupScreen() {
         >
           <Text style={styles.secondaryBtnText}>클립보드에서 붙여넣기</Text>
         </Pressable>
-        <TextInput
-          value={pasted}
-          onChangeText={setPasted}
-          placeholder="또는 여기에 직접 붙여넣기"
-          placeholderTextColor={Colors.textSecondary}
-          multiline
-          textAlignVertical="top"
-          style={styles.textarea}
-        />
+        {pasted ? (
+          <View style={styles.pastedChip}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pastedTitle}>백업 데이터가 준비됐어요</Text>
+              <Text style={styles.pastedMeta}>
+                {pasted.length.toLocaleString()}자 · 아래 “불러오기 실행”을 눌러주세요
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setPasted('');
+                Keyboard.dismiss();
+              }}
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.5 }}
+            >
+              <Text style={styles.pastedClear}>지우기</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <TextInput
+            value={pasted}
+            onChangeText={setPasted}
+            placeholder="또는 여기에 직접 붙여넣기"
+            placeholderTextColor={Colors.textSecondary}
+            multiline
+            textAlignVertical="top"
+            style={styles.textarea}
+          />
+        )}
         <Pressable
           onPress={onImport}
           disabled={busy || !pasted.trim()}
@@ -278,7 +302,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   textarea: {
-    minHeight: 120,
+    minHeight: 100,
+    maxHeight: 160,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 8,
@@ -287,6 +312,31 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     backgroundColor: Colors.background,
     fontFamily: 'Menlo',
+  },
+  pastedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: Colors.primaryLight,
+  },
+  pastedTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.primaryDark,
+  },
+  pastedMeta: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  pastedClear: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.sunday,
   },
   dangerBtn: {
     backgroundColor: Colors.sunday,
