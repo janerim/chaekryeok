@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
+import { UpdatePrompt } from '@/components/common/UpdatePrompt';
 
 export default function RootLayout() {
   const init = useBookStore((s) => s.init);
@@ -73,6 +74,7 @@ export default function RootLayout() {
             }}
           />
         </Stack>
+        <UpdatePrompt />
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
