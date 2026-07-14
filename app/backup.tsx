@@ -49,7 +49,7 @@ export default function BackupScreen() {
   const onExport = async () => {
     setBusy(true);
     try {
-      const { json, path } = await buildBackupJson(makeProgress('백업 중'));
+      const { json } = await buildBackupJson(makeProgress('백업 중'));
       await Clipboard.setStringAsync(json);
       await Share.share({
         message: json,
@@ -57,7 +57,7 @@ export default function BackupScreen() {
       });
       Alert.alert(
         '내보내기 완료',
-        `기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권을 내보냈습니다.\n클립보드에도 복사되었고, 파일은 다음 경로에 저장됐어요.\n\n${path}`
+        `기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권을 내보냈어요.\n\n• 클립보드에 복사됨 (메모 등에 붙여넣기 가능)\n• 파일 앱 › 내 iPhone › 책력 폴더에서도 확인할 수 있어요`
       );
     } catch (e: any) {
       Alert.alert('내보내기 실패', e?.message ?? String(e));
