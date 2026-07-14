@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Colors } from '@/constants/colors';
 import {
   buildBackupJson,
@@ -81,10 +83,10 @@ export default function BackupScreen() {
     }
   };
 
-  const runImport = async (mode: 'replace' | 'append') => {
+  const runImport = async (mode: 'replace' | 'append', raw: string) => {
     setBusy(true);
     try {
-      const parsed = parseBackupJson(pasted);
+      const parsed = parseBackupJson(raw);
       const n = await importBackup(parsed, mode, makeProgress('복원 중'));
       await refresh();
       await refreshWishlist();
@@ -101,27 +103,45 @@ export default function BackupScreen() {
     }
   };
 
-  const onImport = () => {
-    if (!pasted.trim()) {
-      Alert.alert('JSON을 먼저 붙여넣어 주세요');
-      return;
-    }
+  const promptImport = (raw: string) => {
     Alert.alert(
       '불러오기 방식',
       `기존 기록 ${books.length}권 · 읽고싶은 ${wishlistItems.length}권에 대해 어떻게 할까요?`,
       [
         { text: '취소', style: 'cancel' },
-        {
-          text: '추가 (중복 가능)',
-          onPress: () => runImport('append'),
-        },
+        { text: '추가 (중복 가능)', onPress: () => runImport('append', raw) },
         {
           text: '덮어쓰기 (전체 삭제 후 복원)',
           style: 'destructive',
-          onPress: () => runImport('replace'),
+          onPress: () => runImport('replace', raw),
         },
       ]
     );
+  };
+
+  const onImport = () => {
+    if (!pasted.trim()) {
+      Alert.alert('JSON을 먼저 붙여넣어 주세요');
+      return;
+    }
+    promptImport(pasted);
+  };
+
+  const onImportFromFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets?.[0];
+      if (!file) return;
+      const content = await FileSystem.readAsStringAsync(file.uri);
+      Keyboard.dismiss();
+      promptImport(content);
+    } catch (e: any) {
+      Alert.alert('파일 읽기 실패', e?.message ?? String(e));
+    }
   };
 
   return (
@@ -158,9 +178,20 @@ export default function BackupScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>불러오기</Text>
         <Text style={styles.cardDesc}>
-          백업해 둔 JSON을 붙여넣어 복원합니다. 표지 이미지도 함께 복원되므로
-          새 기기나 재설치 후에도 표지가 유지됩니다.
+          백업해 둔 JSON 파일을 선택하거나 붙여넣어 복원합니다. 표지 이미지도 함께
+          복원되므로 새 기기나 재설치 후에도 표지가 유지됩니다.
         </Text>
+        <Pressable
+          onPress={onImportFromFile}
+          disabled={busy}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            (pressed || busy) && { opacity: 0.5 },
+          ]}
+        >
+          <Text style={styles.primaryBtnText}>파일에서 불러오기</Text>
+        </Pressable>
+        <Text style={styles.orDivider}>또는 텍스트로 붙여넣기</Text>
         <Pressable
           onPress={onPasteClipboard}
           disabled={busy}
@@ -332,6 +363,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  orDivider: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
   },
   textarea: {
     minHeight: 100,
