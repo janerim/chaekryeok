@@ -30,8 +30,11 @@ export type BackupFile = {
 };
 
 // 저장된 표지의 실제 파일을 읽어 base64로 붙인다. (원격 URL/파일 없음이면 생략)
+export type ProgressFn = (done: number, total: number) => void;
+
 async function attachCoverData<T extends { cover_local_path: string | null }>(
-  rows: T[]
+  rows: T[],
+  onItem?: () => void
 ): Promise<WithCover<T>[]> {
   const out: WithCover<T>[] = [];
   for (const r of rows) {
@@ -48,6 +51,7 @@ async function attachCoverData<T extends { cover_local_path: string | null }>(
       } catch {}
     }
     out.push({ ...r, cover_b64 });
+    onItem?.();
   }
   return out;
 }
@@ -77,14 +81,21 @@ async function restoreCoverData(
   }
 }
 
-export async function buildBackupJson(): Promise<{
+export async function buildBackupJson(onProgress?: ProgressFn): Promise<{
   json: string;
   path: string;
 }> {
   const [books, wishlist] = await Promise.all([listBooks(), listWishlist()]);
+  const total = books.length + wishlist.length;
+  let done = 0;
+  onProgress?.(0, total);
+  const tick = () => {
+    done += 1;
+    onProgress?.(done, total);
+  };
   const [booksWithCover, wishlistWithCover] = await Promise.all([
-    attachCoverData(books),
-    attachCoverData(wishlist),
+    attachCoverData(books, tick),
+    attachCoverData(wishlist, tick),
   ]);
   const payload: BackupFile = {
     version: 3,
@@ -143,7 +154,8 @@ export async function wipeAllData(): Promise<void> {
 
 export async function importBackup(
   file: BackupFile,
-  mode: 'replace' | 'append'
+  mode: 'replace' | 'append',
+  onProgress?: ProgressFn
 ): Promise<{ books: number; wishlist: number }> {
   if (mode === 'replace') {
     const db = await getDB();
@@ -152,8 +164,13 @@ export async function importBackup(
       await db.runAsync('DELETE FROM wishlist');
     } catch {}
   }
+  const total = file.books.length + file.wishlist.length;
+  let done = 0;
+  onProgress?.(0, total);
   let bookCount = 0;
   for (const b of file.books) {
+    done += 1;
+    onProgress?.(done, total);
     const coverPath = await restoreCoverData(b.cover_b64, b.cover_local_path ?? null);
     const input: BookInput = {
       title: b.title,
@@ -179,6 +196,8 @@ export async function importBackup(
   }
   let wishlistCount = 0;
   for (const w of file.wishlist) {
+    done += 1;
+    onProgress?.(done, total);
     const coverPath = await restoreCoverData(w.cover_b64, w.cover_local_path ?? null);
     const input: WishlistInput = {
       title: w.title,

@@ -19,6 +19,7 @@ import {
   importBackup,
   parseBackupJson,
   wipeAllData,
+  type ProgressFn,
 } from '@/lib/backup';
 import { useBookStore } from '@/store/bookStore';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -28,6 +29,18 @@ export default function BackupScreen() {
   const { items: wishlistItems, refresh: refreshWishlist } = useWishlistStore();
   const [busy, setBusy] = useState(false);
   const [pasted, setPasted] = useState('');
+  const [progress, setProgress] = useState<{ label: string; pct: number } | null>(
+    null
+  );
+
+  const makeProgress =
+    (label: string): ProgressFn =>
+    (done, total) => {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 100;
+      setProgress((p) =>
+        p && p.pct === pct && p.label === label ? p : { label, pct }
+      );
+    };
 
   useEffect(() => {
     refreshWishlist().catch(console.error);
@@ -36,7 +49,7 @@ export default function BackupScreen() {
   const onExport = async () => {
     setBusy(true);
     try {
-      const { json, path } = await buildBackupJson();
+      const { json, path } = await buildBackupJson(makeProgress('백업 중'));
       await Clipboard.setStringAsync(json);
       await Share.share({
         message: json,
@@ -50,6 +63,7 @@ export default function BackupScreen() {
       Alert.alert('내보내기 실패', e?.message ?? String(e));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -71,7 +85,7 @@ export default function BackupScreen() {
     setBusy(true);
     try {
       const parsed = parseBackupJson(pasted);
-      const n = await importBackup(parsed, mode);
+      const n = await importBackup(parsed, mode, makeProgress('복원 중'));
       await refresh();
       await refreshWishlist();
       setPasted('');
@@ -83,6 +97,7 @@ export default function BackupScreen() {
       Alert.alert('불러오기 실패', e?.message ?? String(e));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -251,7 +266,24 @@ export default function BackupScreen() {
 
       {busy && (
         <View style={styles.busyOverlay}>
-          <ActivityIndicator color={Colors.primary} />
+          <View style={styles.busyCard}>
+            <ActivityIndicator color={Colors.primary} />
+            {progress && (
+              <>
+                <Text style={styles.progressText}>
+                  {progress.label}… {progress.pct}%
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[styles.progressFill, { width: `${progress.pct}%` }]}
+                  />
+                </View>
+                <Text style={styles.progressHint}>
+                  이미지가 많으면 조금 걸릴 수 있어요
+                </Text>
+              </>
+            )}
+          </View>
         </View>
       )}
 
@@ -353,6 +385,38 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  busyCard: {
+    minWidth: 220,
+    maxWidth: 300,
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  progressTrack: {
+    alignSelf: 'stretch',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.border,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  progressHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
 });
