@@ -33,6 +33,7 @@ const GENRE_PALETTE = [
   '#455A64',
   '#7E57C2',
   '#EF5350',
+  '#00838F',
 ];
 
 export default function StatsScreen() {
