@@ -1,17 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { differenceInCalendarDays } from 'date-fns';
 import { Colors } from '@/constants/colors';
 import { resolveCoverUri } from '@/lib/covers';
-import { getBook, type Book } from '@/db/database';
+import { formatWrittenAt } from '@/lib/datetime';
+import {
+  deleteNote,
+  getBook,
+  insertNote,
+  listNotes,
+  updateNote,
+  type Book,
+  type BookNote,
+} from '@/db/database';
 import { useBookStore } from '@/store/bookStore';
 import { StarRating } from '@/components/book/StarRating';
 
@@ -19,12 +34,68 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const bookId = id ? Number(id) : null;
   const { books } = useBookStore();
+  const insets = useSafeAreaInsets();
   const [book, setBook] = useState<Book | null>(null);
+  const [notes, setNotes] = useState<BookNote[]>([]);
+  // editing: null = 닫힘, 'new' = 새 기록, 숫자 = 해당 기록 수정
+  const [editing, setEditing] = useState<number | 'new' | null>(null);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const reloadNotes = useCallback(async () => {
+    if (bookId === null) return;
+    setNotes(await listNotes(bookId));
+  }, [bookId]);
 
   useEffect(() => {
     if (bookId === null) return;
     getBook(bookId).then(setBook);
-  }, [bookId, books]);
+    reloadNotes();
+  }, [bookId, books, reloadNotes]);
+
+  const openNew = () => {
+    setDraft('');
+    setEditing('new');
+  };
+
+  const openEdit = (note: BookNote) => {
+    setDraft(note.body);
+    setEditing(note.id);
+  };
+
+  const onSaveNote = async () => {
+    const body = draft.trim();
+    if (!body || bookId === null || editing === null) return;
+    setBusy(true);
+    try {
+      if (editing === 'new') {
+        await insertNote(bookId, body);
+      } else {
+        await updateNote(editing, body);
+      }
+      await reloadNotes();
+      setEditing(null);
+    } catch (e: any) {
+      Alert.alert('저장 실패', e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDeleteNote = (note: BookNote) => {
+    Alert.alert('이 기록을 지울까요?', '되돌릴 수 없습니다.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteNote(note.id);
+          await reloadNotes();
+          setEditing(null);
+        },
+      },
+    ]);
+  };
 
   if (!book) {
     return (
@@ -58,7 +129,11 @@ export default function BookDetailScreen() {
                   params: { id: String(book.id) },
                 })
               }
-              hitSlop={10}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              style={({ pressed }) => [
+                styles.headerBtnWrap,
+                pressed && { opacity: 0.45 },
+              ]}
             >
               <Text style={styles.headerBtn}>편집</Text>
             </Pressable>
@@ -150,11 +225,116 @@ export default function BookDetailScreen() {
       </View>
 
       <View style={styles.card}>
-        <Block label="한줄 감상" value={book.short_review} />
-        <Block label="메모/독후감" value={book.memo} />
+        <Block
+          label="한줄 감상"
+          value={book.short_review}
+          writtenAt={book.short_review_updated_at}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.notesHeader}>
+          <Text style={styles.rowLabel}>메모/독후감</Text>
+          {notes.length > 0 && (
+            <Text style={styles.notesCount}>기록 {notes.length}개</Text>
+          )}
+        </View>
+
+        {notes.length === 0 ? (
+          <Text style={[styles.blockValue, styles.rowValueMuted]}>
+            아직 기록이 없습니다.
+          </Text>
+        ) : (
+          notes.map((n) => (
+            <Pressable
+              key={n.id}
+              onPress={() => openEdit(n)}
+              style={({ pressed }) => [styles.note, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.noteStamp}>
+                {formatWrittenAt(n.created_at)}
+                {n.updated_at ? ' · 수정됨' : ''}
+              </Text>
+              <Text style={styles.blockValue}>{n.body}</Text>
+            </Pressable>
+          ))
+        )}
+
+        <Pressable
+          onPress={openNew}
+          style={({ pressed }) => [styles.addNote, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.addNoteText}>＋ 기록 추가</Text>
+        </Pressable>
       </View>
 
       <View style={{ height: 32 }} />
+
+      <Modal
+        visible={editing !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditing(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View
+            style={[
+              styles.modalCard,
+              { paddingBottom: Math.max(insets.bottom, 12) + 16 },
+            ]}
+          >
+            <Text style={styles.modalTitle}>
+              {editing === 'new' ? '새 기록' : '기록 수정'}
+            </Text>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              style={styles.modalInput}
+              placeholder="자유롭게 기록"
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              autoFocus
+              textAlignVertical="top"
+            />
+            <View style={styles.modalActions}>
+              <Pressable onPress={() => setEditing(null)} style={styles.modalBtn}>
+                <Text style={styles.modalBtnText}>취소</Text>
+              </Pressable>
+              <Pressable
+                onPress={onSaveNote}
+                disabled={busy || !draft.trim()}
+                style={[
+                  styles.modalBtn,
+                  styles.modalSave,
+                  (busy || !draft.trim()) && { opacity: 0.5 },
+                ]}
+              >
+                <Text style={[styles.modalBtnText, styles.modalSaveText]}>
+                  저장
+                </Text>
+              </Pressable>
+            </View>
+
+            {typeof editing === 'number' && (
+              <Pressable
+                onPress={() => {
+                  const target = notes.find((n) => n.id === editing);
+                  if (target) onDeleteNote(target);
+                }}
+                style={({ pressed }) => [
+                  styles.modalDelete,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text style={styles.modalDeleteText}>이 기록 삭제</Text>
+              </Pressable>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -173,13 +353,23 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-function Block({ label, value }: { label: string; value: string | null | undefined }) {
+function Block({
+  label,
+  value,
+  writtenAt,
+}: {
+  label: string;
+  value: string | null | undefined;
+  writtenAt?: string | null;
+}) {
+  const stamp = value ? formatWrittenAt(writtenAt) : null;
   return (
     <View style={styles.block}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text style={[styles.blockValue, !value && styles.rowValueMuted]}>
         {value || '—'}
       </Text>
+      {!!stamp && <Text style={styles.blockStamp}>{stamp} 작성</Text>}
     </View>
   );
 }
@@ -272,10 +462,83 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     lineHeight: 21,
   },
+  blockStamp: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    opacity: 0.8,
+    textAlign: 'right',
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  notesCount: { fontSize: 11, color: Colors.textSecondary, opacity: 0.8 },
+  note: {
+    paddingVertical: 10,
+    gap: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  noteStamp: { fontSize: 11, color: Colors.textSecondary, opacity: 0.8 },
+  addNote: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  addNoteText: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  modalInput: {
+    minHeight: 140,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 4,
+  },
+  modalBtn: { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 8 },
+  modalBtnText: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary },
+  modalSave: { backgroundColor: Colors.primary },
+  modalSaveText: { color: '#fff' },
+  modalDelete: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    marginTop: 4,
+  },
+  modalDeleteText: { fontSize: 14, fontWeight: '600', color: '#C0392B' },
+  // 터치 영역은 Pressable 쪽에서 확보한다 (Text 패딩만으로는 세로가 너무 얇다)
+  headerBtnWrap: { paddingVertical: 10, paddingHorizontal: 12, marginRight: -4 },
   headerBtn: {
     color: Colors.primary,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    paddingHorizontal: 8,
   },
 });

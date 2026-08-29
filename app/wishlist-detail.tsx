@@ -10,6 +10,7 @@ import {
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { resolveCoverUri } from '@/lib/covers';
+import { formatWrittenAt } from '@/lib/datetime';
 import { getWishlistItem, type Wishlist } from '@/db/database';
 import { useWishlistStore } from '@/store/wishlistStore';
 
@@ -44,7 +45,11 @@ export default function WishlistDetailScreen() {
                   params: { id: String(item.id) },
                 })
               }
-              hitSlop={10}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              style={({ pressed }) => [
+                styles.headerBtnWrap,
+                pressed && { opacity: 0.45 },
+              ]}
             >
               <Text style={styles.headerBtn}>편집</Text>
             </Pressable>
@@ -84,7 +89,7 @@ export default function WishlistDetailScreen() {
       </View>
 
       <View style={styles.card}>
-        <Block label="메모" value={item.memo} />
+        <Block label="메모" value={item.memo} writtenAt={item.memo_updated_at} />
       </View>
 
       <Pressable
@@ -118,13 +123,23 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-function Block({ label, value }: { label: string; value: string | null | undefined }) {
+function Block({
+  label,
+  value,
+  writtenAt,
+}: {
+  label: string;
+  value: string | null | undefined;
+  writtenAt?: string | null;
+}) {
+  const stamp = value ? formatWrittenAt(writtenAt) : null;
   return (
     <View style={styles.block}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text style={[styles.blockValue, !value && styles.rowValueMuted]}>
         {value || '—'}
       </Text>
+      {!!stamp && <Text style={styles.blockStamp}>{stamp} 작성</Text>}
     </View>
   );
 }
@@ -214,11 +229,18 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     lineHeight: 21,
   },
+  blockStamp: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    opacity: 0.8,
+    textAlign: 'right',
+  },
+  // 터치 영역은 Pressable 쪽에서 확보한다 (Text 패딩만으로는 세로가 너무 얇다)
+  headerBtnWrap: { paddingVertical: 10, paddingHorizontal: 12, marginRight: -4 },
   headerBtn: {
     color: Colors.primary,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    paddingHorizontal: 8,
   },
   primaryBtn: {
     marginTop: 4,

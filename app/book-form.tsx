@@ -16,12 +16,20 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
 import { useWishlistStore } from '@/store/wishlistStore';
-import { getBook, getWishlistItem, type BookInput, type Wishlist } from '@/db/database';
+import {
+  getBook,
+  getWishlistItem,
+  insertNote,
+  type Book,
+  type BookInput,
+  type Wishlist,
+} from '@/db/database';
 import { StarRating } from '@/components/book/StarRating';
 import { GenreSelector } from '@/components/book/GenreTag';
 import { DatePickerButton } from '@/components/common/DatePickerButton';
 import { deleteLocalImage, pickWebImage } from '@/hooks/useImagePicker';
 import { resolveCoverUri } from '@/lib/covers';
+import { formatWrittenAt } from '@/lib/datetime';
 
 const EMPTY: BookInput = {
   title: '',
@@ -38,7 +46,6 @@ const EMPTY: BookInput = {
   wishlist_added_date: null,
   rating: 0,
   short_review: '',
-  memo: '',
   read_count: 1,
 };
 
@@ -63,6 +70,13 @@ export default function BookFormScreen() {
   );
   const [isReading, setIsReading] = useState(false);
   const [originalCover, setOriginalCover] = useState<string | null>(null);
+  // 편집 시작 시점의 한줄 감상 원본과 작성 시각 (내용이 그대로일 때만 시각을 보여준다)
+  const [loaded, setLoaded] = useState<Pick<
+    Book,
+    'short_review' | 'short_review_updated_at'
+  > | null>(null);
+  // 새 책을 만들 때 함께 남기는 첫 기록. 기존 책의 기록은 상세 화면에서 관리한다.
+  const [firstNote, setFirstNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [fromWishlistId, setFromWishlistId] = useState<number | null>(
     initialWishlistId
@@ -90,10 +104,10 @@ export default function BookFormScreen() {
       author: w.author ?? '',
       publisher: w.publisher ?? '',
       genre: w.genre,
-      memo: w.memo ?? '',
       cover_local_path: w.cover_local_path ?? f.cover_local_path,
       wishlist_added_date: w.created_at ?? null,
     }));
+    if (w.memo?.trim()) setFirstNote(w.memo);
     setFromWishlistId(w.id);
   };
 
@@ -116,8 +130,11 @@ export default function BookFormScreen() {
         wishlist_added_date: b.wishlist_added_date ?? null,
         rating: b.rating ?? 0,
         short_review: b.short_review ?? '',
-        memo: b.memo ?? '',
         read_count: b.read_count,
+      });
+      setLoaded({
+        short_review: b.short_review,
+        short_review_updated_at: b.short_review_updated_at,
       });
       setIsReading(
         !b.finish_date && !!b.start_date && (b.is_stopped ?? 0) !== 1
@@ -125,6 +142,17 @@ export default function BookFormScreen() {
       setOriginalCover(b.cover_local_path);
     });
   }, [editId, isEdit]);
+
+  const writtenHint = () => {
+    if (!loaded) return undefined;
+    if (
+      (form.short_review?.trim() || null) !== (loaded.short_review?.trim() || null)
+    ) {
+      return undefined;
+    }
+    const stamp = formatWrittenAt(loaded.short_review_updated_at);
+    return stamp ? `${stamp} 작성` : undefined;
+  };
 
   const update = <K extends keyof BookInput>(k: K, v: BookInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -174,7 +202,6 @@ export default function BookFormScreen() {
         author: form.author?.trim() || null,
         publisher: form.publisher?.trim() || null,
         short_review: form.short_review?.trim() || null,
-        memo: form.memo?.trim() || null,
         rating: form.rating || null,
         finish_date: isReading || form.is_stopped ? null : form.finish_date,
         stopped_date: form.is_stopped ? form.stopped_date : null,
@@ -187,7 +214,10 @@ export default function BookFormScreen() {
         }
         await editBook(editId, payload);
       } else {
-        await addBook(payload);
+        const newId = await addBook(payload);
+        if (firstNote.trim()) {
+          await insertNote(newId, firstNote.trim());
+        }
         if (fromWishlistId !== null) {
           await removeWishlist(fromWishlistId, { keepCover: true }).catch(
             () => {}
@@ -407,7 +437,10 @@ export default function BookFormScreen() {
           />
         </Field>
 
-        <Field label={`한줄 감상 (${form.short_review?.length ?? 0}/200)`}>
+        <Field
+          label={`한줄 감상 (${form.short_review?.length ?? 0}/200)`}
+          hint={writtenHint()}
+        >
           <TextInput
             value={form.short_review ?? ''}
             onChangeText={(v) => v.length <= 200 && update('short_review', v)}
@@ -417,24 +450,29 @@ export default function BookFormScreen() {
           />
         </Field>
 
-        <View onLayout={(e) => { memoY.current = e.nativeEvent.layout.y; }}>
-          <Field label="메모/독후감">
-            <TextInput
-              value={form.memo ?? ''}
-              onChangeText={(v) => update('memo', v)}
-              style={[styles.input, styles.multiline]}
-              placeholder="자유롭게 기록"
-              placeholderTextColor={Colors.textSecondary}
-              multiline
-              textAlignVertical="top"
-              onFocus={() => {
-                setTimeout(() => {
-                  scrollRef.current?.scrollTo({ y: memoY.current - 20, animated: true });
-                }, 300);
-              }}
-            />
-          </Field>
-        </View>
+        {!isEdit && (
+          <View onLayout={(e) => { memoY.current = e.nativeEvent.layout.y; }}>
+            <Field
+              label="메모/독후감"
+              hint="저장하면 첫 기록으로 남습니다"
+            >
+              <TextInput
+                value={firstNote}
+                onChangeText={setFirstNote}
+                style={[styles.input, styles.multiline]}
+                placeholder="자유롭게 기록"
+                placeholderTextColor={Colors.textSecondary}
+                multiline
+                textAlignVertical="top"
+                onFocus={() => {
+                  setTimeout(() => {
+                    scrollRef.current?.scrollTo({ y: memoY.current - 20, animated: true });
+                  }, 300);
+                }}
+              />
+            </Field>
+          </View>
+        )}
 
         <Field label="읽은 횟수">
           <View style={styles.counterRow}>
@@ -474,11 +512,20 @@ export default function BookFormScreen() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {children}
+      {!!hint && <Text style={styles.fieldHint}>{hint}</Text>}
     </View>
   );
 }
@@ -502,6 +549,12 @@ const styles = StyleSheet.create({
   coverPlaceholderText: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
   coverHint: { fontSize: 11, color: Colors.textSecondary },
   fieldLabel: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+  fieldHint: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    opacity: 0.8,
+    textAlign: 'right',
+  },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,

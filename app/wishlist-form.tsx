@@ -12,6 +12,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { getWishlistItem, type WishlistInput } from '@/db/database';
+import { formatWrittenAt } from '@/lib/datetime';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { GenreSelector } from '@/components/book/GenreTag';
 import { deleteLocalImage, pickWebImage } from '@/hooks/useImagePicker';
@@ -34,6 +35,11 @@ export default function WishlistFormScreen() {
   const { add, edit } = useWishlistStore();
   const [form, setForm] = useState<WishlistInput>(EMPTY);
   const [originalCover, setOriginalCover] = useState<string | null>(null);
+  // 편집 시작 시점의 메모 원본과 작성 시각 (내용이 그대로일 때만 시각을 보여준다)
+  const [loaded, setLoaded] = useState<{
+    memo: string | null;
+    memo_updated_at: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const memoY = useRef(0);
@@ -50,9 +56,19 @@ export default function WishlistFormScreen() {
         memo: w.memo ?? '',
         cover_local_path: w.cover_local_path ?? null,
       });
+      setLoaded({ memo: w.memo, memo_updated_at: w.memo_updated_at });
       setOriginalCover(w.cover_local_path ?? null);
     });
   }, [editId, isEdit]);
+
+  const writtenHint = () => {
+    if (!loaded) return undefined;
+    if ((form.memo?.trim() || null) !== (loaded.memo?.trim() || null)) {
+      return undefined;
+    }
+    const stamp = formatWrittenAt(loaded.memo_updated_at);
+    return stamp ? `${stamp} 작성` : undefined;
+  };
 
   const update = <K extends keyof WishlistInput>(k: K, v: WishlistInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -144,7 +160,7 @@ export default function WishlistFormScreen() {
           <GenreSelector value={form.genre} onChange={(v) => update('genre', v)} />
         </Field>
         <View onLayout={(e) => { memoY.current = e.nativeEvent.layout.y; }}>
-          <Field label="메모">
+          <Field label="메모" hint={writtenHint()}>
             <TextInput
               value={form.memo ?? ''}
               onChangeText={(v) => update('memo', v)}
@@ -176,11 +192,20 @@ export default function WishlistFormScreen() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {children}
+      {!!hint && <Text style={styles.fieldHint}>{hint}</Text>}
     </View>
   );
 }
@@ -188,6 +213,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 16 },
   fieldLabel: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+  fieldHint: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    opacity: 0.8,
+    textAlign: 'right',
+  },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,

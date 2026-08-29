@@ -17,7 +17,6 @@ const base: Omit<BookInput, 'title'> = {
   wishlist_added_date: null,
   rating: null,
   short_review: null,
-  memo: null,
   read_count: 1,
 };
 
