@@ -1,4 +1,6 @@
 import Constants from 'expo-constants';
+import { format } from 'date-fns';
+import { getMeta, setMeta } from '@/db/database';
 
 // App Store 조회용 정보
 const BUNDLE_ID = 'com.ryubi.chaengnyeok';
@@ -54,4 +56,33 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   } catch {
     return null;
   }
+}
+
+// 마지막으로 팝업을 띄운 기록. "<스토어 버전>|<YYYY-MM-DD>" 형태로 저장한다.
+const LAST_PROMPT_KEY = 'update_prompt_last';
+
+/**
+ * 같은 버전 안내는 하루에 한 번만 띄운다.
+ * 단, 그 사이 더 새로운 버전이 올라왔다면 날짜와 무관하게 바로 알린다.
+ * 저장소 접근이 실패하면 안내를 막지 않는 쪽(true)으로 둔다.
+ */
+export async function shouldPrompt(storeVersion: string): Promise<boolean> {
+  try {
+    const raw = await getMeta(LAST_PROMPT_KEY);
+    if (!raw) return true;
+    const [shownVersion, shownDate] = raw.split('|');
+    if (shownVersion !== storeVersion) return true;
+    return shownDate !== format(new Date(), 'yyyy-MM-dd');
+  } catch {
+    return true;
+  }
+}
+
+export async function markPrompted(storeVersion: string): Promise<void> {
+  try {
+    await setMeta(
+      LAST_PROMPT_KEY,
+      `${storeVersion}|${format(new Date(), 'yyyy-MM-dd')}`
+    );
+  } catch {}
 }

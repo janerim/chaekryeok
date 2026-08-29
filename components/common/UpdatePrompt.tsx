@@ -9,7 +9,12 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '@/constants/colors';
-import { checkForUpdate, type UpdateInfo } from '@/lib/appUpdate';
+import {
+  checkForUpdate,
+  markPrompted,
+  shouldPrompt,
+  type UpdateInfo,
+} from '@/lib/appUpdate';
 
 // 로컬 개발(expo run:ios)에서 팝업 UI를 미리 보려면 아래 false를 true로 바꾼다.
 // __DEV__ 가드가 있어 실제 배포(App Store/TestFlight) 빌드에서는 절대 켜지지 않는다.
@@ -32,11 +37,14 @@ export function UpdatePrompt() {
       return;
     }
     let alive = true;
-    checkForUpdate()
-      .then((u) => {
-        if (alive && u) setInfo(u);
-      })
-      .catch(() => {});
+    (async () => {
+      const u = await checkForUpdate();
+      if (!alive || !u) return;
+      // 같은 버전 안내가 매번 뜨지 않도록 하루 한 번으로 제한한다.
+      if (!(await shouldPrompt(u.storeVersion))) return;
+      await markPrompted(u.storeVersion);
+      if (alive) setInfo(u);
+    })().catch(() => {});
     return () => {
       alive = false;
     };

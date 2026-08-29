@@ -3,11 +3,14 @@ import { format } from 'date-fns';
 import {
   getDB,
   insertBook,
+  insertNote,
   insertWishlist,
   listBooks,
+  listNotes,
   listWishlist,
   type Book,
   type BookInput,
+  type BookNote,
   type Wishlist,
   type WishlistInput,
 } from '@/db/database';
@@ -21,11 +24,14 @@ import {
 // 백업/복원 시 표지 이미지 데이터를 함께 담기 위한 필드
 type WithCover<T> = T & { cover_b64?: string | null };
 
+// 책에 딸린 기록은 books 항목 안에 notes 배열로 함께 담는다.
+type BackupBook = WithCover<Book> & { notes?: BookNote[] };
+
 export type BackupFile = {
-  version: 3;
+  version: 5;
   app: 'chaengnyeok';
   exportedAt: string;
-  books: WithCover<Book>[];
+  books: BackupBook[];
   wishlist: WithCover<Wishlist>[];
 };
 
@@ -97,11 +103,15 @@ export async function buildBackupJson(onProgress?: ProgressFn): Promise<{
     attachCoverData(books, tick),
     attachCoverData(wishlist, tick),
   ]);
+  const withNotes: BackupBook[] = [];
+  for (const b of booksWithCover) {
+    withNotes.push({ ...b, notes: await listNotes(b.id) });
+  }
   const payload: BackupFile = {
-    version: 3,
+    version: 5,
     app: 'chaengnyeok',
     exportedAt: new Date().toISOString(),
-    books: booksWithCover,
+    books: withNotes,
     wishlist: wishlistWithCover,
   };
   const json = JSON.stringify(payload, null, 2);
@@ -121,7 +131,7 @@ export function parseBackupJson(raw: string): BackupFile {
   if (!parsed || parsed.app !== 'chaengnyeok') {
     throw new Error('책력 백업 파일이 아닙니다.');
   }
-  if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
+  if (![1, 2, 3, 4, 5].includes(parsed.version)) {
     throw new Error(`지원하지 않는 버전입니다 (v${parsed.version}).`);
   }
   if (!Array.isArray(parsed.books)) {
@@ -129,7 +139,7 @@ export function parseBackupJson(raw: string): BackupFile {
   }
   const wishlist = Array.isArray(parsed.wishlist) ? parsed.wishlist : [];
   return {
-    version: 3,
+    version: 5,
     app: 'chaengnyeok',
     exportedAt: parsed.exportedAt ?? new Date().toISOString(),
     books: parsed.books,
@@ -146,6 +156,7 @@ export async function wipeAllData(): Promise<void> {
       await FileSystem.deleteAsync(coversDir, { idempotent: true });
     }
   } catch {}
+  await db.runAsync('DELETE FROM book_notes');
   await db.runAsync('DELETE FROM books');
   try {
     await db.runAsync('DELETE FROM wishlist');
@@ -159,6 +170,7 @@ export async function importBackup(
 ): Promise<{ books: number; wishlist: number }> {
   if (mode === 'replace') {
     const db = await getDB();
+    await db.runAsync('DELETE FROM book_notes');
     await db.runAsync('DELETE FROM books');
     try {
       await db.runAsync('DELETE FROM wishlist');
@@ -187,11 +199,20 @@ export async function importBackup(
       wishlist_added_date: b.wishlist_added_date ?? null,
       rating: b.rating ?? null,
       short_review: b.short_review ?? null,
-      memo: b.memo ?? null,
+      short_review_updated_at: b.short_review_updated_at ?? null,
       read_count: b.read_count ?? 1,
     };
     if (!input.title) continue;
-    await insertBook(input);
+    const newId = await insertBook(input);
+    // v5부터는 notes 배열, 그 이전 백업은 books.memo 하나가 첫 기록이 된다.
+    if (Array.isArray(b.notes) && b.notes.length > 0) {
+      for (const n of b.notes) {
+        if (!n?.body?.trim()) continue;
+        await insertNote(newId, n.body, n.created_at ?? undefined);
+      }
+    } else if (b.memo?.trim()) {
+      await insertNote(newId, b.memo, b.memo_updated_at ?? undefined);
+    }
     bookCount++;
   }
   let wishlistCount = 0;
@@ -205,6 +226,7 @@ export async function importBackup(
       publisher: w.publisher ?? null,
       genre: w.genre ?? null,
       memo: w.memo ?? null,
+      memo_updated_at: w.memo_updated_at ?? null,
       cover_local_path: coverPath,
     };
     if (!input.title) continue;
