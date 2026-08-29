@@ -4,6 +4,8 @@ App Store Connect의 "이번 버전의 새로운 기능"에 넣는 문구를 모
 
 ## 1.0.3
 
+### 한국어
+
 ```
 • 메모/독후감을 여러 번 나눠 남길 수 있어요. 읽는 중간중간 적은 기록이 작성 시각과 함께 시간순으로 쌓입니다.
 • 지금까지 쓰신 메모는 그대로 첫 번째 기록으로 옮겨져요.
@@ -12,6 +14,18 @@ App Store Connect의 "이번 버전의 새로운 기능"에 넣는 문구를 모
 • 백업에 기록이 함께 담겨, 복원해도 작성 시각까지 그대로 남아요.
 • 책 상세 화면의 '편집' 버튼이 더 잘 눌려요.
 • 새 버전 안내가 하루에 한 번만 표시돼요.
+```
+
+### English
+
+```
+• You can now jot down notes as you read. Each entry is saved with the time you wrote it and stacks up in order.
+• Notes you've already written are carried over as your first entry.
+• Tap any entry to edit or delete it.
+• One-line reviews and reading list notes now show when you wrote them.
+• Backups include your notes, so the timestamps survive a restore.
+• The Edit button on the book detail screen is easier to tap.
+• New version notices now appear at most once a day.
 ```
 
 ## 1.0.2
