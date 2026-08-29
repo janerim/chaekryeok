@@ -118,157 +118,164 @@ export default function BookDetailScreen() {
   const status = isStopped ? '중단' : isReading ? '읽는 중' : book.finish_date ? '완독' : '기록';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/book-form',
-                  params: { id: String(book.id) },
-                })
-              }
-              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-              style={({ pressed }) => [
-                styles.headerBtnWrap,
-                pressed && { opacity: 0.45 },
-              ]}
-            >
-              <Text style={styles.headerBtn}>편집</Text>
-            </Pressable>
-          ),
-        }}
-      />
-      <View style={styles.coverWrap}>
-        {book.cover_local_path ? (
-          <Image source={{ uri: resolveCoverUri(book.cover_local_path)! }} style={styles.cover} />
-        ) : (
-          <View style={[styles.cover, styles.coverEmpty]}>
-            <Text style={styles.muted}>표지 없음</Text>
-          </View>
-        )}
-      </View>
-
-      <Text style={styles.title}>{book.title}</Text>
-      {!!book.author && <Text style={styles.sub}>{book.author}</Text>}
-
-      <View style={styles.badges}>
-        <View
-          style={[
-            styles.badge,
-            {
-              backgroundColor: isReading
-                ? Colors.accent
-                : isStopped
-                  ? Colors.textSecondary
-                  : book.finish_date
-                    ? Colors.primary
-                    : Colors.textSecondary,
-            },
-          ]}
-        >
-          <Text style={styles.badgeText}>{status}</Text>
-        </View>
-        {!!book.genre && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{book.genre}</Text>
-          </View>
-        )}
-        {book.from_wishlist === 1 && (
-          <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
-            <Text style={styles.badgeText}>🔖 위시리스트</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Row label="제목" value={book.title} />
-        <Row label="저자" value={book.author} />
-        <Row label="출판사" value={book.publisher} />
-        <Row label="장르" value={book.genre} />
-      </View>
-
-      <View style={styles.card}>
-        {book.from_wishlist === 1 && (
-          <Row
-            label="읽고 싶어한 날"
-            value={book.wishlist_added_date?.slice(0, 10) ?? null}
-          />
-        )}
-        <Row label="시작일" value={book.start_date} />
-        <Row
-          label="완독일"
-          value={
-            book.finish_date ?? (isReading ? '읽는 중' : isStopped ? '중단됨' : null)
-          }
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/book-form',
+                    params: { id: String(book.id) },
+                  })
+                }
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                style={({ pressed }) => [
+                  styles.headerBtnWrap,
+                  pressed && { opacity: 0.45 },
+                ]}
+              >
+                <Text style={styles.headerBtn}>편집</Text>
+              </Pressable>
+            ),
+          }}
         />
-        {isStopped && <Row label="중단일" value={book.stopped_date} />}
-        <Row label="기간" value={period !== null ? `${period}일` : null} />
-        <Row label="읽는 중" value={isReading ? '예' : '아니오'} />
-        <Row label="읽다가 멈춤" value={isStopped ? '예' : '아니오'} />
-      </View>
-
-      <View style={styles.card}>
-        <Row label="소장 여부" value={book.is_owned === 1 ? '소장' : '미소장'} />
-        <Row label="읽은 횟수" value={`${book.read_count}회`} />
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>평점</Text>
-          <View style={styles.rowValueWrap}>
-            {book.rating ? (
-              <StarRating value={book.rating} readonly size={18} />
-            ) : (
-              <Text style={styles.rowValueMuted}>—</Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Block
-          label="한줄 감상"
-          value={book.short_review}
-          writtenAt={book.short_review_updated_at}
-        />
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.notesHeader}>
-          <Text style={styles.rowLabel}>메모/독후감</Text>
-          {notes.length > 0 && (
-            <Text style={styles.notesCount}>기록 {notes.length}개</Text>
+        <View style={styles.coverWrap}>
+          {book.cover_local_path ? (
+            <Image source={{ uri: resolveCoverUri(book.cover_local_path)! }} style={styles.cover} />
+          ) : (
+            <View style={[styles.cover, styles.coverEmpty]}>
+              <Text style={styles.muted}>표지 없음</Text>
+            </View>
           )}
         </View>
 
-        {notes.length === 0 ? (
-          <Text style={[styles.blockValue, styles.rowValueMuted]}>
-            아직 기록이 없습니다.
-          </Text>
-        ) : (
-          notes.map((n) => (
-            <Pressable
-              key={n.id}
-              onPress={() => openEdit(n)}
-              style={({ pressed }) => [styles.note, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={styles.noteStamp}>
-                {formatWrittenAt(n.created_at)}
-                {n.updated_at ? ' · 수정됨' : ''}
-              </Text>
-              <Text style={styles.blockValue}>{n.body}</Text>
-            </Pressable>
-          ))
-        )}
+        <Text style={styles.title}>{book.title}</Text>
+        {!!book.author && <Text style={styles.sub}>{book.author}</Text>}
 
-        <Pressable
-          onPress={openNew}
-          style={({ pressed }) => [styles.addNote, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.addNoteText}>＋ 기록 추가</Text>
-        </Pressable>
-      </View>
+        <View style={styles.badges}>
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor: isReading
+                  ? Colors.accent
+                  : isStopped
+                    ? Colors.textSecondary
+                    : book.finish_date
+                      ? Colors.primary
+                      : Colors.textSecondary,
+              },
+            ]}
+          >
+            <Text style={styles.badgeText}>{status}</Text>
+          </View>
+          {!!book.genre && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{book.genre}</Text>
+            </View>
+          )}
+          {book.from_wishlist === 1 && (
+            <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+              <Text style={styles.badgeText}>🔖 위시리스트</Text>
+            </View>
+          )}
+        </View>
 
-      <View style={{ height: 32 }} />
+        <View style={styles.card}>
+          <Row label="제목" value={book.title} />
+          <Row label="저자" value={book.author} />
+          <Row label="출판사" value={book.publisher} />
+          <Row label="장르" value={book.genre} />
+        </View>
+
+        <View style={styles.card}>
+          {book.from_wishlist === 1 && (
+            <Row
+              label="읽고 싶어한 날"
+              value={book.wishlist_added_date?.slice(0, 10) ?? null}
+            />
+          )}
+          <Row label="시작일" value={book.start_date} />
+          <Row
+            label="완독일"
+            value={
+              book.finish_date ?? (isReading ? '읽는 중' : isStopped ? '중단됨' : null)
+            }
+          />
+          {isStopped && <Row label="중단일" value={book.stopped_date} />}
+          <Row label="기간" value={period !== null ? `${period}일` : null} />
+          <Row label="읽는 중" value={isReading ? '예' : '아니오'} />
+          <Row label="읽다가 멈춤" value={isStopped ? '예' : '아니오'} />
+        </View>
+
+        <View style={styles.card}>
+          <Row label="소장 여부" value={book.is_owned === 1 ? '소장' : '미소장'} />
+          <Row label="읽은 횟수" value={`${book.read_count}회`} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>평점</Text>
+            <View style={styles.rowValueWrap}>
+              {book.rating ? (
+                <StarRating value={book.rating} readonly size={18} />
+              ) : (
+                <Text style={styles.rowValueMuted}>—</Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Block
+            label="한줄 감상"
+            value={book.short_review}
+            writtenAt={book.short_review_updated_at}
+          />
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.notesHeader}>
+            <Text style={styles.rowLabel}>메모/독후감</Text>
+            {notes.length > 0 && (
+              <Text style={styles.notesCount}>기록 {notes.length}개</Text>
+            )}
+          </View>
+
+          {notes.length === 0 ? (
+            <Text style={[styles.blockValue, styles.rowValueMuted]}>
+              아직 기록이 없습니다.
+            </Text>
+          ) : (
+            notes.map((n) => (
+              <Pressable
+                key={n.id}
+                onPress={() => openEdit(n)}
+                style={({ pressed }) => [styles.note, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.noteStamp}>
+                  {formatWrittenAt(n.created_at)}
+                  {n.updated_at ? ' · 수정됨' : ''}
+                </Text>
+                <Text style={styles.blockValue}>{n.body}</Text>
+              </Pressable>
+            ))
+          )}
+
+          <Pressable
+            onPress={openNew}
+            style={({ pressed }) => [styles.addNote, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={styles.addNoteText}>＋ 기록 추가</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ height: 32 }} />
+
+      </ScrollView>
 
       <Modal
         visible={editing !== null}
@@ -335,7 +342,7 @@ export default function BookDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
 
