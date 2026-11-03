@@ -14,6 +14,10 @@
       "backgroundColor": "#EAF3DE"
     },
     "ios": {
+      "icon": {
+        "light": "./assets/icon-light.png",
+        "dark": "./assets/icon-dark.png"
+      },
       "supportsTablet": false,
       "bundleIdentifier": "com.ryubi.chaengnyeok",
       "buildNumber": "1",
