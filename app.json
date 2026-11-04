@@ -23,6 +23,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "ko",
+        "CFBundleLocalizations": ["ko"],
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true
       }
