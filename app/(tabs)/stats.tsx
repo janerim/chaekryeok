@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { differenceInCalendarDays, format, subMonths } from 'date-fns';
 import Svg, { Circle, G } from 'react-native-svg';
+import { GoalCard } from '@/components/goal/GoalCard';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
 import type { Book } from '@/db/database';
@@ -43,7 +44,12 @@ export default function StatsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      {/* GoalCard의 입력 시트가 이 안에 있어서, 키보드가 열린 채 버튼을 눌러도 탭이 먹히게 한다 */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <GoalCard books={books} />
         <View style={styles.summaryRow}>
           <SummaryCard label="총 기록" value={`${data.total}권`} />
           <SummaryCard label="완독" value={`${data.finished}권`} />

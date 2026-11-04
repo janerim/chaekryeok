@@ -14,7 +14,7 @@
 | 📅 캘린더 | 월 단위 달력. 시작일~완독일 구간을 막대로 표시하고, 완독·읽는 중·중단을 구분해서 보여줍니다. (주 시작: 월요일) |
 | 📚 전체 기록 | 등록한 모든 책을 월별로 묶어서 보여줍니다. 제목·저자·출판사 검색, 전체/읽는 중/완독/중단 필터 |
 | 🔖 읽고 싶은 | 위시리스트. 읽기 시작하면 기록으로 옮겨집니다(`from_wishlist`로 출처를 유지). |
-| 📊 통계 | 총 기록/완독/읽는 중 권수, 평균 독서 기간, 평균 평점, 장르 분포 도넛 차트 등 |
+| 📊 통계 | 연간 독서 목표 진행률, 총 기록/완독/읽는 중 권수, 평균 독서 기간, 평균 평점, 장르 분포 도넛 차트 등 |
 
 그 밖에
 
@@ -89,10 +89,11 @@ store/                    bookStore, wishlistStore (zustand)
 
 ## 데이터 모델
 
-`books`, `wishlist` 두 테이블이 전부입니다.
+주요 테이블은 `books`, `wishlist`, `book_notes`, `reading_goals`입니다.
 
 - **books** — `title`(필수), `author`, `publisher`, `genre`, `cover_local_path`, `start_date`, `finish_date`, `is_owned`, `is_stopped`, `stopped_date`, `from_wishlist`, `wishlist_added_date`, `rating`, `short_review`, `memo`, `read_count`, `created_at`, `updated_at`
 - **wishlist** — `title`(필수), `author`, `publisher`, `genre`, `memo`, `cover_local_path`, `created_at`
+- **reading_goals** — `year`(기본 키), `target`(목표 권수)
 
 날짜는 모두 `yyyy-MM-dd` 문자열입니다. 스키마 변경은 `getDB()` 안에서 `ALTER TABLE ... ADD COLUMN`을 try/catch로 감싸 처리하므로, 기존 사용자의 DB도 그대로 열립니다. **컬럼을 추가할 때는 이 패턴을 따라주세요.**
 
@@ -108,16 +109,17 @@ iOS는 앱을 재설치·업데이트하면 문서 디렉토리의 컨테이너 
 
 ```jsonc
 {
-  "version": 3,
+  "version": 6,
   "app": "chaengnyeok",
   "exportedAt": "2026-01-01T00:00:00.000Z",
   "books":    [ { /* books 행 + cover_b64 */ } ],
-  "wishlist": [ { /* wishlist 행 + cover_b64 */ } ]
+  "wishlist": [ { /* wishlist 행 + cover_b64 */ } ],
+  "goals":    [ { "year": 2026, "target": 24 } ]
 }
 ```
 
 표지 이미지는 `cover_b64`(base64)로 함께 들어가서 파일 하나로 기기 이전이 됩니다.
-복원은 v1·v2·v3를 모두 읽을 수 있고, `app` 필드가 `chaengnyeok`이 아니면 거부합니다 ([lib/backup.ts](lib/backup.ts)).
+복원은 v1~v6을 모두 읽을 수 있고, `app` 필드가 `chaengnyeok`이 아니면 거부합니다 ([lib/backup.ts](lib/backup.ts)).
 
 ## 장르
 

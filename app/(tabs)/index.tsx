@@ -17,7 +17,10 @@ import { resolveCoverUri } from '@/lib/covers';
 import { useBookStore } from '@/store/bookStore';
 import { MonthNavigator } from '@/components/calendar/MonthNavigator';
 import { CalendarGrid } from '@/components/calendar/CalendarGrid';
+import { GoalProgressBar } from '@/components/goal/GoalProgressBar';
 import { shiftMonth, useCalendarMatrix, type DayCell } from '@/hooks/useCalendar';
+import { finishedCountInYear } from '@/lib/goal';
+import { useGoalStore } from '@/store/goalStore';
 import type { Book } from '@/db/database';
 
 type DayEntry = { book: Book; status: '완독' | '시작' | '읽는 중' | '중단' };
@@ -27,6 +30,12 @@ export default function CalendarScreen() {
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<DayCell | null>(null);
   const weeks = useCalendarMatrix(month, books);
+  const year = month.getFullYear();
+  const goal = useGoalStore((s) => s.goals[year]);
+  const finishedThisYear = useMemo(
+    () => finishedCountInYear(books, year),
+    [books, year]
+  );
 
   const entries = useMemo<DayEntry[]>(() => {
     if (!selected) return [];
@@ -86,6 +95,21 @@ export default function CalendarScreen() {
           </Pressable>
         </View>
       </View>
+
+      {goal ? (
+        <Pressable
+          onPress={() => router.navigate('/stats')}
+          style={({ pressed }) => [styles.goalStrip, pressed && styles.pressed]}
+        >
+          <Text style={styles.goalLabel}>{year}년 목표</Text>
+          <View style={styles.goalBar}>
+            <GoalProgressBar ratio={Math.min(1, finishedThisYear / goal)} height={6} />
+          </View>
+          <Text style={styles.goalCount}>
+            {finishedThisYear} / {goal}권
+          </Text>
+        </Pressable>
+      ) : null}
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <CalendarGrid
@@ -209,6 +233,23 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   topRight: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  goalStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  goalLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  goalBar: { flex: 1 },
+  goalCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
   todayBtn: {
     paddingHorizontal: 12,
     paddingVertical: 7,

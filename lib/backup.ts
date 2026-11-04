@@ -6,11 +6,14 @@ import {
   insertNote,
   insertWishlist,
   listBooks,
+  listGoals,
   listNotes,
   listWishlist,
+  saveGoal,
   type Book,
   type BookInput,
   type BookNote,
+  type ReadingGoal,
   type Wishlist,
   type WishlistInput,
 } from '@/db/database';
@@ -20,6 +23,7 @@ import {
   isRemoteCover,
   resolveCoverUri,
 } from '@/lib/covers';
+import { GOAL_MAX, GOAL_MIN } from '@/lib/goal';
 
 // 백업/복원 시 표지 이미지 데이터를 함께 담기 위한 필드
 type WithCover<T> = T & { cover_b64?: string | null };
@@ -28,11 +32,12 @@ type WithCover<T> = T & { cover_b64?: string | null };
 type BackupBook = WithCover<Book> & { notes?: BookNote[] };
 
 export type BackupFile = {
-  version: 5;
+  version: 6;
   app: 'chaengnyeok';
   exportedAt: string;
   books: BackupBook[];
   wishlist: WithCover<Wishlist>[];
+  goals: ReadingGoal[];
 };
 
 // 저장된 표지의 실제 파일을 읽어 base64로 붙인다. (원격 URL/파일 없음이면 생략)
@@ -91,7 +96,11 @@ export async function buildBackupJson(onProgress?: ProgressFn): Promise<{
   json: string;
   path: string;
 }> {
-  const [books, wishlist] = await Promise.all([listBooks(), listWishlist()]);
+  const [books, wishlist, goals] = await Promise.all([
+    listBooks(),
+    listWishlist(),
+    listGoals(),
+  ]);
   const total = books.length + wishlist.length;
   let done = 0;
   onProgress?.(0, total);
@@ -108,11 +117,12 @@ export async function buildBackupJson(onProgress?: ProgressFn): Promise<{
     withNotes.push({ ...b, notes: await listNotes(b.id) });
   }
   const payload: BackupFile = {
-    version: 5,
+    version: 6,
     app: 'chaengnyeok',
     exportedAt: new Date().toISOString(),
     books: withNotes,
     wishlist: wishlistWithCover,
+    goals,
   };
   const json = JSON.stringify(payload, null, 2);
   const filename = `chaengnyeok_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
@@ -131,19 +141,30 @@ export function parseBackupJson(raw: string): BackupFile {
   if (!parsed || parsed.app !== 'chaengnyeok') {
     throw new Error('책력 백업 파일이 아닙니다.');
   }
-  if (![1, 2, 3, 4, 5].includes(parsed.version)) {
+  if (![1, 2, 3, 4, 5, 6].includes(parsed.version)) {
     throw new Error(`지원하지 않는 버전입니다 (v${parsed.version}).`);
   }
   if (!Array.isArray(parsed.books)) {
     throw new Error('books 배열을 찾을 수 없습니다.');
   }
   const wishlist = Array.isArray(parsed.wishlist) ? parsed.wishlist : [];
+  // v6부터 목표가 담긴다. 이전 백업은 목표 없이 복원된다.
+  const goals: ReadingGoal[] = Array.isArray(parsed.goals)
+    ? parsed.goals.filter(
+        (g: any) =>
+          Number.isInteger(g?.year) &&
+          Number.isInteger(g?.target) &&
+          g.target >= GOAL_MIN &&
+          g.target <= GOAL_MAX
+      )
+    : [];
   return {
-    version: 5,
+    version: 6,
     app: 'chaengnyeok',
     exportedAt: parsed.exportedAt ?? new Date().toISOString(),
     books: parsed.books,
     wishlist,
+    goals,
   };
 }
 
@@ -158,6 +179,7 @@ export async function wipeAllData(): Promise<void> {
   } catch {}
   await db.runAsync('DELETE FROM book_notes');
   await db.runAsync('DELETE FROM books');
+  await db.runAsync('DELETE FROM reading_goals');
   try {
     await db.runAsync('DELETE FROM wishlist');
   } catch {}
@@ -172,9 +194,15 @@ export async function importBackup(
     const db = await getDB();
     await db.runAsync('DELETE FROM book_notes');
     await db.runAsync('DELETE FROM books');
+    await db.runAsync('DELETE FROM reading_goals');
     try {
       await db.runAsync('DELETE FROM wishlist');
     } catch {}
+  }
+  // 이어붙이기에서 같은 해 목표가 이미 있으면 지금 기기의 목표를 유지한다.
+  const existingGoalYears = new Set((await listGoals()).map((g) => g.year));
+  for (const g of file.goals) {
+    if (!existingGoalYears.has(g.year)) await saveGoal(g.year, g.target);
   }
   const total = file.books.length + file.wishlist.length;
   let done = 0;

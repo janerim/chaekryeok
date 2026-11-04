@@ -5,14 +5,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/colors';
 import { useBookStore } from '@/store/bookStore';
+import { useGoalStore } from '@/store/goalStore';
 import { UpdatePrompt } from '@/components/common/UpdatePrompt';
 
 export default function RootLayout() {
   const init = useBookStore((s) => s.init);
+  const refreshGoals = useGoalStore((s) => s.refresh);
 
   useEffect(() => {
-    init().catch(console.error);
-  }, [init]);
+    // DB 테이블 생성이 끝난 뒤에 목표를 읽는다
+    init().then(refreshGoals).catch(console.error);
+  }, [init, refreshGoals]);
 
   return (
     <SafeAreaProvider>

@@ -142,9 +142,41 @@ export async function getDB(): Promise<SQLite.SQLiteDatabase> {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+    CREATE TABLE IF NOT EXISTS reading_goals (
+      year INTEGER PRIMARY KEY,
+      target INTEGER NOT NULL
+    );
   `);
   await migrateMemoToNotes(dbInstance);
   return dbInstance;
+}
+
+// 연간 독서 목표. 사용자 데이터라 app_meta가 아닌 별도 테이블에 두고 백업에도 담는다.
+export type ReadingGoal = {
+  year: number;
+  target: number;
+};
+
+export async function listGoals(): Promise<ReadingGoal[]> {
+  const db = await getDB();
+  return db.getAllAsync<ReadingGoal>(
+    'SELECT year, target FROM reading_goals ORDER BY year'
+  );
+}
+
+export async function saveGoal(year: number, target: number): Promise<void> {
+  const db = await getDB();
+  await db.runAsync(
+    `INSERT INTO reading_goals (year, target) VALUES (?, ?)
+     ON CONFLICT(year) DO UPDATE SET target = excluded.target`,
+    year,
+    target
+  );
+}
+
+export async function deleteGoal(year: number): Promise<void> {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM reading_goals WHERE year = ?', year);
 }
 
 // 앱 동작에 쓰는 소소한 설정값 저장소 (사용자 데이터가 아니라 백업 대상은 아니다)

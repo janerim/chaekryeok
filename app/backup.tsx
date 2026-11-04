@@ -24,11 +24,13 @@ import {
   type ProgressFn,
 } from '@/lib/backup';
 import { useBookStore } from '@/store/bookStore';
+import { useGoalStore } from '@/store/goalStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 
 export default function BackupScreen() {
   const { books, refresh } = useBookStore();
   const { items: wishlistItems, refresh: refreshWishlist } = useWishlistStore();
+  const refreshGoals = useGoalStore((s) => s.refresh);
   const [busy, setBusy] = useState(false);
   const [pasted, setPasted] = useState('');
   const [progress, setProgress] = useState<{ label: string; pct: number } | null>(
@@ -90,6 +92,7 @@ export default function BackupScreen() {
       const n = await importBackup(parsed, mode, makeProgress('복원 중'));
       await refresh();
       await refreshWishlist();
+      await refreshGoals();
       setPasted('');
       Alert.alert(
         '불러오기 완료',
@@ -272,6 +275,7 @@ export default function BackupScreen() {
                       await wipeAllData();
                       await refresh();
                       await refreshWishlist();
+                      await refreshGoals();
                       Alert.alert('삭제 완료', '모든 데이터가 삭제되었습니다.', [
                         { text: '확인', onPress: () => router.back() },
                       ]);
