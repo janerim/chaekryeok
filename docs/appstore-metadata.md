@@ -121,7 +121,7 @@ App Store Connect 에 그대로 붙여 넣는 텍스트다. 형식과 문장은 
 | 지원 URL (필수) | `docs/support.md` → `https://janerim.github.io/chaekryeok/support` |
 | 마케팅 URL | 비워 둔다. 홍보용 랜딩 페이지가 없다 |
 | 버전 | `1.1.0` — 업로드한 빌드의 `version` 과 같아야 한다 |
-| 저작권 | `2026 오정림` — © 기호는 Apple 이 붙이므로 넣지 않는다. 집중력과 같이 정한다 |
+| 저작권 | `© 2026 ryubi` |
 
 ---
 
