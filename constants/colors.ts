@@ -8,8 +8,8 @@ export const Colors = {
   textPrimary: '#1A1A1A',
   textSecondary: '#6B7280',
   border: '#E5E7EB',
-  saturday: '#3D7EFF',
-  sunday: '#FF3B30',
+  saturday: '#4C84D6',
+  sunday: '#E06257',
   todayBg: '#EAF3DE',
   star: '#FFC107',
 } as const;
