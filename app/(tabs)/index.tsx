@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { resolveCoverUri } from '@/lib/covers';
 import { useBookStore } from '@/store/bookStore';
@@ -90,8 +91,10 @@ export default function CalendarScreen() {
             onPress={() => router.push('/book-form')}
             style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="책 추가"
           >
-            <Text style={styles.addBtnText}>＋</Text>
+            <Ionicons name="add" size={22} color="#fff" />
           </Pressable>
         </View>
       </View>
@@ -265,7 +268,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: { fontSize: 20, color: '#fff', fontWeight: '600', lineHeight: 22 },
   pressed: { opacity: 0.6 },
   backdrop: {
     flex: 1,

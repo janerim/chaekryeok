@@ -6,7 +6,7 @@ export const Colors = {
   background: '#FFFFFF',
   surface: '#F8F9FA',
   textPrimary: '#1A1A1A',
-  textSecondary: '#888888',
+  textSecondary: '#6B7280',
   border: '#E5E7EB',
   saturday: '#3D7EFF',
   sunday: '#FF3B30',
